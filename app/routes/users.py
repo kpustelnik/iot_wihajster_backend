@@ -1,34 +1,90 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from app.database import get_db
 from app.docs import Tags
+from app.models.user import UserType, User
+from app.repos import user_repo
+from app.schemas.user import UserModel
+from app.utils.auth.auth import RequireUser
 
 router = APIRouter(
     prefix="/users",
-    tags=None,
+    tags=[Tags.Users],
     responses={}
 )
 
 
-@router.get("",
-            dependencies=[],
-            tags=[Tags.Users.Admin],
-            response_model=None,
-            responses=None,
-            status_code=status.HTTP_200_OK,
-            summary="Get users",
-            response_description="Successful Response")
-async def get_users(
-        offset: int = Query(default=0, ge=0),
-        limit: int = Query(default=100, ge=0, le=500),
+@router.post("/login",
+             dependencies=None,
+             tags=None,
+             response_model=None,
+             responses=None,
+             status_code=status.HTTP_200_OK,
+             summary="login",
+             response_description="Successful Response")
+async def login(
+        login: str,
+        password: str,
+        db: AsyncSession = Depends(get_db),
+):
+    # TODO it's so stupid, add a model or something
+    """
+    Login user.
+    """
+    return await user_repo.login(db, login, password)
+
+
+@router.post("/logout",
+             dependencies=None,
+             tags=None,
+             response_model=None,
+             responses=None,
+             status_code=status.HTTP_200_OK,
+             summary="logout",
+             response_description="Successful Response")
+async def logout():
+    """
+    Logout.
+    """
+    return await user_repo.logout()
+
+
+@router.post("/recover",
+             dependencies=None,
+             tags=None,
+             response_model=None,
+             responses=None,
+             status_code=status.HTTP_200_OK,
+             summary="recover password",
+             response_description="Successful Response")
+async def recover(
+        login: str,
         db: AsyncSession = Depends(get_db),
 ):
     """
-    Get users. Users can be searched by filling the query param. \\
-    User type can be added for additional filtering. \\
-    Search terms are split by space. They can be: index_number, mail, name, surname or second_name. \\
-    Checks if max search terms have not been exceeded, otherwise raises 422 Unprocessable.
+    Recover password.
     """
-    return ...
+    return await user_repo.recover(db, login)
+
+
+@router.get("/current",
+            dependencies=None,
+            tags=None,
+            response_model=UserModel,
+            responses=None,
+            status_code=status.HTTP_200_OK,
+            summary="get current user",
+            response_description="Successful Response")
+async def current(
+        user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN]))
+):
+    """
+    Get current user.
+    """
+    return user
+
+# TODO get users and search
+# TODO add email verification
+# TODO delete user

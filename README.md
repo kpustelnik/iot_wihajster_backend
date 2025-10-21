@@ -17,6 +17,7 @@ Device:
 - day_start
 - day_end
 - privacy: [Private, Public, Protected] - no, all, limited GPS
+- battery
   
 Measurements:
 - device_id

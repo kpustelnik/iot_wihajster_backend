@@ -1,18 +1,28 @@
+from enum import Enum
+
+
+class Tags(Enum):
+    Users = "Users"
+    Settings = "Settings"
+    Measurements = "Measurements"
+    Device = "Device"
+
+
 tags_metadata = [
     {
-        "name": "Users",
+        "name": Tags.Users,
         "description": "Operations with users.",
     },
     {
-        "name": "Settings",
+        "name": Tags.Settings,
         "description": "Operations with managing devices and family.",
     },
     {
-        "name": "Measurements",
+        "name": Tags.Measurements,
         "description": "Getting measurements from devices.",
     },
     {
-        "name": "Device",
+        "name": Tags.Device,
         "description": "Operations with devices.",
     },
 ]

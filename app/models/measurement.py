@@ -11,10 +11,10 @@ class Measurement(Base):
 
     device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), primary_key=True)
     time: Mapped[datetime] = mapped_column(primary_key=True)
-    humidity: Mapped[int] = mapped_column()
-    temperature: Mapped[float] = mapped_column(Numeric(5, 2, asdecimal=True))  # TODO debate if asdecimal true or false
-    pressure: Mapped[int] = mapped_column()
-    PM25: Mapped[int] = mapped_column()
-    PM10: Mapped[int] = mapped_column()
-    longitude: Mapped[float] = mapped_column()
-    latitude: Mapped[float] = mapped_column()
+    humidity: Mapped[int] = mapped_column(nullable=True)
+    temperature: Mapped[float] = mapped_column(Numeric(5, 2, asdecimal=True), nullable=True)  # TODO debate if asdecimal true or false
+    pressure: Mapped[int] = mapped_column(nullable=True)
+    PM25: Mapped[int] = mapped_column(nullable=True)
+    PM10: Mapped[int] = mapped_column(nullable=True)
+    longitude: Mapped[float] = mapped_column(nullable=True)
+    latitude: Mapped[float] = mapped_column(nullable=True)

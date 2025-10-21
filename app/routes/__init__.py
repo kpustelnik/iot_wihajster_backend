@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.routes import users
+from app.routes import users, devices
 
 router = APIRouter()
 
