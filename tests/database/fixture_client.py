@@ -12,7 +12,7 @@ from app_common.database import get_db, Base
 from frontend_api.main import app
 from tests.database.csv_to_db import entries
 from app_common.config import settings
-from frontend_api.utils.auth.auth import make_token  # TODO seperate device and frontend tests
+from frontend_api.utils.auth.auth import make_token
 
 
 @pytest_asyncio.fixture(name="session", scope="session", autouse=True)

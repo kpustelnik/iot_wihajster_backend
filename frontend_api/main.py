@@ -2,8 +2,10 @@ import os
 
 from fastapi import FastAPI
 from starlette.responses import RedirectResponse
+from starlette.staticfiles import StaticFiles
 
 from app_common.lifespan import lifespan
+from app_common.config import settings
 from frontend_api.routes import router
 from frontend_api.docs import tags_metadata
 
@@ -22,6 +24,5 @@ async def root():
 
 
 # For development
-# FIXME why?
-# if settings.debug:
-#     app.mount("/", StaticFiles(directory="static"), name="static")
+if settings.debug:
+    app.mount("/", StaticFiles(directory="static"), name="static")

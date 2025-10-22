@@ -16,7 +16,7 @@ async def lifespan(_app: FastAPI):
         from tests.database.csv_to_db import postgres_entries
         session = sessionmanager.session()
         for f in ["user", "device", "family", "measurement"]:  # FIXME it's stupid
-            try:
+            try:  # FIXME and this is peak stupidity
                 session.add_all(postgres_entries[f])
                 await session.commit()
             except:

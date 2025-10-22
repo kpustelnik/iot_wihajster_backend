@@ -29,13 +29,13 @@ async def create_measurement(
     device_update = DeviceUpdateModel.model_validate(device_data_dict)
     try:
         db.add(measurement)
-        stmt = (update(Device).
-                where(Device.id == device_data.id).
-                values({k: v if v != "null" else None for k, v in device_update.model_dump().items()}))
-        await db.execute(stmt)
+        # stmt = (update(Device).
+        #         where(Device.id == device_data.id).
+        #         values({k: v if v != "null" else None for k, v in device_update.model_dump().items()}))
+        # await db.execute(stmt)
         await db.commit()
     except IntegrityError as e:
         await db.rollback()
-        logger.log(f"Database error: {e}")
+        logger.log(0, f"Database error: {e}")  # FIXME why does it need level?
 
     return settings

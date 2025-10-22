@@ -33,7 +33,6 @@ async def login(
         login: LoginModel,
         db: AsyncSession = Depends(get_db),
 ):
-    # TODO it's so stupid, add a model or something
     """
     Login user.
     """

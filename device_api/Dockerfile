@@ -41,6 +41,7 @@ ENV BUILD_TIME=$BUILD_TIME
 
 COPY ./app_common /code/app_common
 COPY ./device_api /code/device_api
+COPY ./static /code/static
 COPY ./config /code/config
 
 ## TODO only in debug

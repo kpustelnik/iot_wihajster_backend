@@ -4,8 +4,8 @@ from typing import Optional, Literal
 
 from pydantic import BaseModel, Field
 
-from schemas import DeviceModel
-from utils.schemas_decorators import update_model
+from app_common.schemas import DeviceModel
+from app_common.utils.schemas_decorators import update_model
 
 
 @update_model(omit=["id", "user_id", "privacy"], nullable="battery")

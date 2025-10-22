@@ -30,6 +30,6 @@ async def create_measurement(
     """
     Get current user.
     """
-    return device_repo.create_measurement(db, device_data)
+    return await device_repo.create_measurement(db, device_data)
 
 # TODO change settings
