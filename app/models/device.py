@@ -1,15 +1,22 @@
 import datetime
+import enum
 
+import sqlalchemy
 from sqlalchemy import ForeignKey, Time, Interval, Enum
 
 from app.database import Base
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class PrivacyLevel(Enum):
+class PrivacyLevel(str, enum.Enum):
     PRIVATE = "Private"
     PUBLIC = "Public"
     PROTECTED = "Protected"
+
+
+class SettingsStatus(str, enum.Enum):
+    PENDING = "Pending"
+    ACCEPTED = "Accepted"
 
 
 class Device(Base):
@@ -21,5 +28,6 @@ class Device(Base):
     night_collection_interval: Mapped[datetime.timedelta] = mapped_column(Interval, default=datetime.timedelta(minutes=15))
     day_start: Mapped[datetime.time] = mapped_column(Time, default=datetime.time(hour=6))
     day_end: Mapped[datetime.time] = mapped_column(Time, default=datetime.time(hour=6))
-    privacy: Mapped[PrivacyLevel] = mapped_column(PrivacyLevel, default=PrivacyLevel.PRIVATE)
+    privacy: Mapped[PrivacyLevel] = mapped_column(sqlalchemy.Enum(PrivacyLevel), default=PrivacyLevel.PRIVATE)
     battery: Mapped[int] = mapped_column(nullable=True, default=None)
+    status: Mapped[str] = mapped_column(sqlalchemy.Enum(SettingsStatus))

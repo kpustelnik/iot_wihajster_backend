@@ -12,7 +12,7 @@ from app.docs import tags_metadata
 description = f'''
 **Build from:** {os.getenv('BUILD_TIME', "unknown")} rev. {os.getenv("CI_COMMIT_SHORT_SHA", "unknown")}.
 '''
-app = FastAPI(lifespan=lifespan, title="Obieraczka backend", openapi_tags=tags_metadata, description=description)
+app = FastAPI(lifespan=lifespan, title="IoT backend", openapi_tags=tags_metadata, description=description)
 
 app.include_router(router)
 

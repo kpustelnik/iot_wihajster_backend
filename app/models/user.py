@@ -1,10 +1,11 @@
-from sqlalchemy import Enum
+import enum
+import sqlalchemy
 
 from app.database import Base
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class UserType(Enum):
+class UserType(str, enum.Enum):
     CLIENT = "client"
     ADMIN = "admin"
 
@@ -16,4 +17,4 @@ class User(Base):
     email: Mapped[str] = mapped_column(unique=True)
     login: Mapped[str] = mapped_column()
     password: Mapped[str] = mapped_column()
-    type: Mapped[str] = mapped_column(UserType)
+    type: Mapped[str] = mapped_column(sqlalchemy.Enum(UserType))

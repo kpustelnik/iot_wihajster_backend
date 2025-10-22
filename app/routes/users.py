@@ -5,7 +5,7 @@ from starlette import status
 from app.database import get_db
 from app.docs import Tags
 from app.models.user import UserType, User
-from app.repos import user_repo
+from app.repos import user_repo, auth_repo
 from app.schemas.user import UserModel
 from app.utils.auth.auth import RequireUser
 
@@ -33,7 +33,7 @@ async def login(
     """
     Login user.
     """
-    return await user_repo.login(db, login, password)
+    return await auth_repo.login(db, login, password)
 
 
 @router.post("/logout",
@@ -48,7 +48,7 @@ async def logout():
     """
     Logout.
     """
-    return await user_repo.logout()
+    return await auth_repo.logout()
 
 
 @router.post("/recover",
@@ -66,7 +66,7 @@ async def recover(
     """
     Recover password.
     """
-    return await user_repo.recover(db, login)
+    return await auth_repo.recover(db, login)
 
 
 @router.get("/current",

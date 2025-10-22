@@ -4,7 +4,7 @@ from typing import Optional, Literal
 
 from pydantic import BaseModel, Field
 
-from app.models.device import PrivacyLevel
+from app.models.device import PrivacyLevel, SettingsStatus
 from app.utils.schemas_decorators import omit, update_model
 
 
@@ -17,6 +17,7 @@ class DeviceModel(BaseModel):
     day_end: datetime.time = Field(examples=[datetime.time(hour=6)], default=datetime.time(hour=6))
     privacy: PrivacyLevel = Field(examples=[PrivacyLevel.PRIVATE], default=PrivacyLevel.PRIVATE)
     battery: Optional[int] = Field(examples=[50], default=None)
+    status: SettingsStatus = Field(examples=[SettingsStatus.ACCEPTED])
 
 
 @omit("user_id", "privacy", "battery")
@@ -38,7 +39,7 @@ class DeviceData(BaseModel):
     day_end: datetime.time = Field(examples=[datetime.time(hour=6)])
     battery: Optional[int | Literal["null"]] = Field(examples=[50], default="null")  # battery is null if it can't be read
     # measurement
-    time: datetime = Field(examples=[datetime.datetime.now()], default=datetime.datetime.now())
+    time: datetime.datetime = Field(examples=[datetime.datetime.now()], default=datetime.datetime.now())
     humidity: Optional[int] = Field(examples=[10], default=None)
     temperature: Optional[Decimal] = Field(examples=[Decimal(21.37)], default=None)
     pressure: Optional[int] = Field(examples=[1024], default=None)

@@ -1,12 +1,13 @@
-import datetime
+import enum
 
-from sqlalchemy import ForeignKey, Time, Interval, Enum
+import sqlalchemy
+from sqlalchemy import ForeignKey
 
 from app.database import Base
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class FamilyStatus(Enum):
+class FamilyStatus(str, enum.Enum):
     PENDING = "pending"
     ACCEPTED = "accepted"
 
@@ -16,4 +17,4 @@ class Family(Base):
 
     main_user_id: Mapped[int] = mapped_column(primary_key=True)
     client_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
-    status: Mapped[FamilyStatus] = mapped_column(FamilyStatus)
+    status: Mapped[FamilyStatus] = mapped_column(sqlalchemy.Enum(FamilyStatus))
