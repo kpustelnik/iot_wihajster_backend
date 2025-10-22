@@ -8,17 +8,17 @@ from app_common.models import User
 from frontend_api.repos.user_repo import get_user_by_login
 from frontend_api.utils.auth.auth import make_token
 from frontend_api.utils.cookies import add_auth_cookie, remove_auth_cookie
+from frontend_api.schemas.auth import LoginModel, PasswordRecoverModel
 
 
 async def login(
         db: AsyncSession,
-        login: str,
-        password: str
+        login: LoginModel
 ):
-    user = await get_user_by_login(db, login)
+    user = await get_user_by_login(db, login.login)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if user.password != password:  # it's stupid, but perfect
+    if user.password != login.password:  # it's stupid, but perfect
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Incorrect password")
     token = make_token(user.id)
     response = JSONResponse({"token": token, "user_id": user.id})
@@ -35,6 +35,6 @@ async def logout():
 async def recover(
         db: AsyncSession,
         login: str
-) -> dict[str, str]:
+) -> PasswordRecoverModel:
     query = select(User).where(User.login == login)
-    return {"password": (await db.scalar(query)).password}
+    return PasswordRecoverModel(password=(await db.scalar(query)).password)

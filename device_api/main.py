@@ -4,13 +4,13 @@ from fastapi import FastAPI
 from starlette.responses import RedirectResponse
 
 from app_common.lifespan import lifespan
-from frontend_api.routes import router
-from frontend_api.docs import tags_metadata
+from device_api.routes import router
+from device_api.docs import tags_metadata
 
 description = f'''
 **Build from:** {os.getenv('BUILD_TIME', "unknown")} rev. {os.getenv("CI_COMMIT_SHORT_SHA", "unknown")}.
 '''
-app = FastAPI(lifespan=lifespan, title="IoT Frontend API", openapi_tags=tags_metadata, description=description)
+app = FastAPI(lifespan=lifespan, title="IoT Device API", openapi_tags=tags_metadata, description=description)
 
 app.include_router(router)
 

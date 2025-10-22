@@ -16,8 +16,11 @@ async def lifespan(_app: FastAPI):
         from tests.database.csv_to_db import postgres_entries
         session = sessionmanager.session()
         for f in ["user", "device", "family", "measurement"]:  # FIXME it's stupid
-            session.add_all(postgres_entries[f])
-            await session.commit()
+            try:
+                session.add_all(postgres_entries[f])
+                await session.commit()
+            except:
+                await session.rollback()
         await session.close()
         logger.critical("DEBUG MODE IS ON")
         logger.critical("Make sure to not use it on production.")

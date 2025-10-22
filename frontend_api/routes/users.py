@@ -9,6 +9,7 @@ from frontend_api.repos import user_repo, auth_repo
 from app_common.schemas.default import Unauthorized, Forbidden, LimitedResponse, NotFound
 from app_common.schemas.user import UserModel
 from frontend_api.utils.auth.auth import RequireUser
+from frontend_api.schemas.auth import LoginModel, PasswordRecoverModel
 
 router = APIRouter(
     prefix="/users",
@@ -29,15 +30,14 @@ router = APIRouter(
              summary="login",
              response_description="Successful Response")
 async def login(
-        login: str,
-        password: str,
+        login: LoginModel,
         db: AsyncSession = Depends(get_db),
 ):
     # TODO it's so stupid, add a model or something
     """
     Login user.
     """
-    return await auth_repo.login(db, login, password)
+    return await auth_repo.login(db, login)
 
 
 @router.post("/logout",
@@ -58,7 +58,7 @@ async def logout():
 @router.post("/recover",
              dependencies=None,
              tags=None,
-             response_model=None,
+             response_model=PasswordRecoverModel,
              responses=None,
              status_code=status.HTTP_200_OK,
              summary="recover password",

@@ -36,19 +36,21 @@ services:
       - db
     ports:
       - 3000:80
-#  device_api:
-#    container_name: device_api
-#    hostname: device_api
-#    build: ./device_api
-#    image: iot/device_api
-#    environment:
-#      - POSTGRES_HOSTNAME=postgres
-#      - POSTGRES_USER=${POSTGRES_USER}
-#      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-#    depends_on:
-#      db:
-#        condition: service_healthy
-#    links:
-#      - db
-#    ports:
-#      - 4000:80
+  device_api:
+    container_name: device_api
+    hostname: device_api
+    build:
+      context: .
+      dockerfile: ./device_api/Dockerfile
+    image: iot/device_api
+    environment:
+      - POSTGRES_HOSTNAME=postgres
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+    ports:
+      - 4000:80
