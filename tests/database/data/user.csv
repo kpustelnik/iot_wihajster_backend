@@ -1,0 +1,5 @@
+id,email,login,password,type
+1,yes@gmail.com,admin,admin,admin
+2,no@gmail.com,user,user,client
+3,no2@gmail.com,user2,user2,client
+4,no3@gmail.com,user3,user3,client

@@ -14,15 +14,17 @@ services:
       - ./docker_data/db:/data/postgres
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -d postgres" ]
+      test: ["CMD-SHELL", "pg_isready -d iot -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 10s
       retries: 15
-  backend:
-    container_name: backend_iot
-    hostname: backend_iot
-    build: .
-    image: iot/wihajster
+  frontend_api:
+    container_name: frontend_api
+    hostname: frontend_api
+    build:
+      context: .
+      dockerfile: ./frontend_api/Dockerfile
+    image: iot/frontend_api
     environment:
       - POSTGRES_HOSTNAME=postgres
       - POSTGRES_USER=${POSTGRES_USER}
@@ -34,3 +36,19 @@ services:
       - db
     ports:
       - 3000:80
+#  device_api:
+#    container_name: device_api
+#    hostname: device_api
+#    build: ./device_api
+#    image: iot/device_api
+#    environment:
+#      - POSTGRES_HOSTNAME=postgres
+#      - POSTGRES_USER=${POSTGRES_USER}
+#      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+#    depends_on:
+#      db:
+#        condition: service_healthy
+#    links:
+#      - db
+#    ports:
+#      - 4000:80
