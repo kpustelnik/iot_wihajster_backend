@@ -2,7 +2,7 @@ import enum
 import sqlalchemy
 
 from app_common.database import Base
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class UserType(str, enum.Enum):
@@ -15,6 +15,23 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(unique=True)
-    login: Mapped[str] = mapped_column()
+    login: Mapped[str] = mapped_column(unique=True)
     password: Mapped[str] = mapped_column()
     type: Mapped[str] = mapped_column(sqlalchemy.Enum(UserType))
+
+    devices = relationship(
+        "Device",
+        uselist=True
+    )
+
+    family_member = relationship(
+        "FamilyMember",
+        passive_deletes=True,
+        cascade="all, delete"
+    )
+
+    family = relationship(
+        "Family",
+        passive_deletes=True,
+        cascade="all, delete"
+    )

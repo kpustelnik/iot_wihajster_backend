@@ -6,7 +6,7 @@ from app_common.database import get_db
 from frontend_api.docs import Tags
 from app_common.models.user import UserType, User
 from frontend_api.repos import user_repo, auth_repo
-from app_common.schemas.default import Unauthorized, Forbidden, LimitedResponse, NotFound
+from app_common.schemas.default import Unauthorized, Forbidden, LimitedResponse, NotFound, Delete
 from app_common.schemas.user import UserModel
 from frontend_api.utils.auth.auth import RequireUser
 from frontend_api.schemas.auth import LoginModel, PasswordRecoverModel
@@ -112,10 +112,10 @@ async def get_users(
 @router.delete("",
                dependencies=[Depends(RequireUser(UserType.ADMIN))],
                tags=None,
-               response_model=LimitedResponse[UserModel],
+               response_model=Delete,
                responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
                status_code=status.HTTP_200_OK,
-               summary="get users",
+               summary="delete users",
                response_description="Successful Response")
 async def delete_user(
         user_id: int,
@@ -128,3 +128,13 @@ async def delete_user(
 
 # TODO add email verification
 # TODO add google login
+
+"""
+ * get users - all for admin, clients for clients
+ * login by login or login by email
+ * create account, provide unique email and login, password
+ * delete account, be logged in, null the device user
+ * get one user
+ * get current user
+ * recover password 
+"""

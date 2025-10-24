@@ -1,0 +1,4 @@
+family_id,user_id,status
+1,2,pending
+1,4,accepted
+2,2,accepted

@@ -5,7 +5,7 @@ import sqlalchemy
 from sqlalchemy import ForeignKey, Time, Interval, Enum
 
 from app_common.database import Base
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class PrivacyLevel(str, enum.Enum):
@@ -31,3 +31,9 @@ class Device(Base):
     privacy: Mapped[PrivacyLevel] = mapped_column(sqlalchemy.Enum(PrivacyLevel), default=PrivacyLevel.PRIVATE)
     battery: Mapped[int] = mapped_column(nullable=True, default=None)
     status: Mapped[str] = mapped_column(sqlalchemy.Enum(SettingsStatus))
+
+    family_device = relationship(
+        "FamilyDevice",
+        passive_deletes=True,
+        cascade="all, delete"
+    )

@@ -8,5 +8,11 @@ router = APIRouter(
     responses={}
 )
 
-# TODO change settings, require access
-# TODO delete yourself from the device, require access
+"""
+ * change device settings only it's owner
+ * delete yourself from the device, require access
+ Device Status:
+    * private: only you and your family
+    * protected: mangle the gps data
+    * public: everybody has access to every data point
+"""

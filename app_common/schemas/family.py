@@ -4,6 +4,17 @@ from app_common.models.family import FamilyStatus
 
 
 class FamilyModel(BaseModel):
-    main_user_id: int = Field(ge=1, examples=[2])
-    client_user_id: int = Field(ge=1, examples=[1])
+    id: int = Field(ge=1, examples=[2])
+    user_id: int = Field(ge=1, examples=[1])
+    name: str = Field(examples=["For family"])
+
+
+class FamilyMemberModel(BaseModel):
+    family_id: int = Field(ge=1, examples=[2])
+    user_id: int = Field(ge=1, examples=[1])
     status: FamilyStatus = Field(examples=[FamilyStatus.PENDING])
+
+
+class FamilyDeviceModel(BaseModel):
+    device_id: int = Field(ge=1, examples=[2])
+    family_id: int = Field(ge=1, examples=[1])
