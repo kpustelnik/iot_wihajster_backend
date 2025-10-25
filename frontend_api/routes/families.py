@@ -33,7 +33,11 @@ router = APIRouter(
     summary="Create family",
     response_description="Successful Response",
 )
-async def create_family(family: FamilyCreate, current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])), db: AsyncSession = Depends(get_db)):
+async def create_family(
+    family: FamilyCreate,
+    current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Crete new user.
     """
@@ -41,20 +45,20 @@ async def create_family(family: FamilyCreate, current_user: User = Depends(Requi
 
 
 @router.post(
-    "/{id}",
+    "/{family_id}/members",
     dependencies=[Depends(RequireUser([UserType.ADMIN, UserType.CLIENT]))],
     tags=[],
-    response_model=FamilyModel,
+    response_model=None,
     responses=None,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create family",
+    status_code=status.HTTP_200_OK,
+    summary="Add member",
     response_description="Successful Response",
 )
-async def add_member(family: FamilyCreate, db: AsyncSession = Depends(get_db)):
+async def add_member(family_id: int, user_id: int, db: AsyncSession = Depends(get_db)):
     """
-    Crete new user.
+    Add member to familys.
     """
-    return await family_repo.add_member(db, family)
+    return await family_repo.add_member(db, family_id, user_id)
 
 
 """
