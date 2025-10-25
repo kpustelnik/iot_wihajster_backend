@@ -152,7 +152,7 @@ async def delete_user(user_id: int, db=Depends(get_db)):
 )
 async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     """
-    Crete new user - admin.
+    Crete new user.
     """
     return await user_repo.create_user(db, user)
 

@@ -50,7 +50,7 @@ async def delete_user(db: AsyncSession, user_id: int) -> Delete:
     return Delete(deleted=1, detail="Deleted user.")
 
 
-async def create_user(db: AsyncSession, user: UserCreate) -> None:
+async def create_user(db: AsyncSession, user: UserCreate) -> User:
     existing_user = await db.scalar(
         select(User).where((User.email == user.email) | (User.login == user.login))
     )
