@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from app_common.config import settings
 from app_common.database import sessionmanager
 
-
 logger = logging.getLogger('uvicorn.error')
 
 
@@ -13,14 +12,9 @@ logger = logging.getLogger('uvicorn.error')
 async def lifespan(_app: FastAPI):
     await sessionmanager.init_db()
     if settings.debug:
-        from tests.database.csv_to_db import postgres_entries
+        from tests.database.csv_to_db import entries
         session = sessionmanager.session()
-        for f in ["user", "device", "family", "measurement"]:  # FIXME it's stupid
-            try:  # FIXME and this is peak stupidity
-                session.add_all(postgres_entries[f])
-                await session.commit()
-            except:
-                await session.rollback()
+        session.add_all(entries)
         await session.close()
         logger.critical("DEBUG MODE IS ON")
         logger.critical("Make sure to not use it on production.")
