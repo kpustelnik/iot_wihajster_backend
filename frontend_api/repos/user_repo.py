@@ -22,7 +22,10 @@ async def get_user_by_login(db: AsyncSession, login: str) -> User | None:
 
 
 async def get_users(
-    db: AsyncSession, user: User, offset: int, limit: int
+    db: AsyncSession,
+        user: User,
+        offset: int,
+        limit: int
 ) -> LimitedResponse[UserModel]:
     count_query = select(func.count()).select_from(User)
     query = select(User).offset(offset).limit(limit)
@@ -43,14 +46,17 @@ async def delete_user(db: AsyncSession, user_id: int) -> Delete:
     user = await db.scalar(query)
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
     await db.delete(user)
     await db.commit()
     return Delete(deleted=1, detail="Deleted user.")
 
 
-async def create_user(db: AsyncSession, user: UserCreate) -> User:
+async def create_user(
+        db: AsyncSession,
+        user: UserCreate
+):
     existing_user = await db.scalar(
         select(User).where((User.email == user.email) | (User.login == user.login))
     )
@@ -61,11 +67,10 @@ async def create_user(db: AsyncSession, user: UserCreate) -> User:
         )
 
     try:
-        user_data = user.model_dump()
-        user_data['type'] = UserType.CLIENT
-        db_user = User(**user_data)
+        db_user = User(**user.model_dump(), type=UserType.CLIENT)
         db.add(db_user)
         await db.commit()
+        await db.refresh(db_user)
         return db_user
     except IntegrityError as e:
         await db.rollback()

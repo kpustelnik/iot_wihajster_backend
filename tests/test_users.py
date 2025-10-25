@@ -2,7 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.database.fixture_client import Cookies
+from schemas.user import UserCreate
+from tests.database.fixture_client import Cookies, get_example
 
 
 # @pytest.mark.asyncio
@@ -25,13 +26,14 @@ def test_logout(client: TestClient, cookies: Cookies):
 
 
 def test_create_user(client: TestClient, cookies: Cookies):
-    valid_user = {"email": "konrad@gmail.com", "login": "konrad", "password": "konrad"}
+    valid_user = get_example(UserCreate)
 
     response = client.post("/users", json=valid_user)
     data = response.json()
     assert response.status_code == 201, f"data: {data}"
-    assert data["email"] == valid_user["email"]
-    assert data["type"] == "client"
+    assert data.pop("id") is not None
+    assert data.pop("type") == "client"
+    assert data == valid_user
 
     response = client.post("/users", json=valid_user)
     assert response.status_code == 422, "Not unique email"

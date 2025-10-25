@@ -38,8 +38,8 @@ router = APIRouter(
     response_description="Successful Response",
 )
 async def login(
-    login: LoginModel,
-    db: AsyncSession = Depends(get_db),
+        login: LoginModel,
+        db: AsyncSession = Depends(get_db),
 ):
     """
     Login user.
@@ -75,8 +75,8 @@ async def logout():
     response_description="Successful Response",
 )
 async def recover(
-    login: str,
-    db: AsyncSession = Depends(get_db),
+        login: str,
+        db: AsyncSession = Depends(get_db),
 ):
     """
     Recover password.
@@ -94,7 +94,9 @@ async def recover(
     summary="get current user",
     response_description="Successful Response",
 )
-async def current(user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN]))):
+async def current(
+        user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN]))
+):
     """
     Get current user.
     """
@@ -112,10 +114,10 @@ async def current(user: User = Depends(RequireUser([UserType.CLIENT, UserType.AD
     response_description="Successful Response",
 )
 async def get_users(
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=0, le=500),
-    user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
-    db=Depends(get_db),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=0, le=500),
+        user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+        db=Depends(get_db),
 ):
     """
     Get users.
@@ -124,7 +126,7 @@ async def get_users(
 
 
 @router.delete(
-    "",
+    "/{user_id}",
     dependencies=[Depends(RequireUser(UserType.ADMIN))],
     tags=None,
     response_model=Delete,
@@ -133,7 +135,10 @@ async def get_users(
     summary="delete users",
     response_description="Successful Response",
 )
-async def delete_user(user_id: int, db=Depends(get_db)):
+async def delete_user(
+        user_id: int,
+        db=Depends(get_db)
+):
     """
     Delete user - admin.
     """
@@ -150,7 +155,10 @@ async def delete_user(user_id: int, db=Depends(get_db)):
     summary="Create user",
     response_description="Successful Response",
 )
-async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
+async def create_user(
+        user: UserCreate,
+        db: AsyncSession = Depends(get_db)
+):
     """
     Crete new user.
     """

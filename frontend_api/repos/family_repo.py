@@ -8,12 +8,12 @@ from sqlalchemy import select
 
 
 async def create_family(
-    db: AsyncSession, family: FamilyCreate, current_user: User
-) -> Family:
+        db: AsyncSession,
+        family: FamilyCreate,
+        current_user: User
+):
     try:
-        family_data = family.model_dump()
-        family_data["user_id"] = current_user.id
-        db_family = Family(**family_data)
+        db_family = Family(**family.model_dump(), user_id=current_user.id)
         db.add(db_family)
         await db.commit()
         return db_family
@@ -22,15 +22,19 @@ async def create_family(
         raise ValueError(f"Database error: {str(e)}")
 
 
-async def add_member(db: AsyncSession, family_id: int, user_id: int) -> None:
+async def add_member(
+        db: AsyncSession,
+        family_id: int,
+        user_id: int
+):
     query = select(Family).where(Family.id == family_id)
-    family_exists = await db.scalar(query)
-    if family_exists is None:
-        raise ValueError("Family does not exist")
+    family = await db.scalar(query)
+    if family is None:
+        raise ValueError("Family does not exist")  # TODO value error is 500, we want better error, 404 Not Found
 
     query = select(User).where(User.id == user_id)
-    user_exits = await db.scalar(query)
-    if user_exits is None:
+    user = await db.scalar(query)
+    if user is None:
         raise ValueError("User does not exists")
 
     query = select(FamilyMember).where(
@@ -38,15 +42,10 @@ async def add_member(db: AsyncSession, family_id: int, user_id: int) -> None:
     )
     user_in_family = await db.scalar(query)
     if user_in_family is not None:
-        raise ValueError("User already in family")
-
-    # FIXME tutaj chyba powinno być to przekazane w argumencie a nie tworzone nie?
-    new_member = FamilyMemberModel(
-        family_id=family_id, user_id=user_id, status=FamilyStatus.PENDING
-    )
+        raise ValueError("User already in family")  # TODO 422
 
     try:
-        db_family_member = FamilyMember(**new_member.model_dump())
+        db_family_member = FamilyMember(family_id=family_id, user_id=user_id, status=FamilyStatus.PENDING)
         db.add(db_family_member)
         await db.commit()
         return db_family_member

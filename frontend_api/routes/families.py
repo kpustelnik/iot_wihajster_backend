@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -8,7 +8,7 @@ from app_common.schemas.default import (
     Forbidden,
     Unauthorized,
 )
-from app_common.schemas.family import FamilyCreate, FamilyModel
+from app_common.schemas.family import FamilyCreate, FamilyModel, FamilyMemberModel
 from frontend_api.docs import Tags
 from frontend_api.repos import family_repo
 from frontend_api.utils.auth.auth import RequireUser
@@ -25,7 +25,7 @@ router = APIRouter(
 
 @router.post(
     "",
-    dependencies=[Depends(RequireUser([UserType.ADMIN, UserType.CLIENT]))],
+    dependencies=[],
     tags=[],
     response_model=FamilyModel,
     responses=None,
@@ -34,9 +34,9 @@ router = APIRouter(
     response_description="Successful Response",
 )
 async def create_family(
-    family: FamilyCreate,
-    current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
-    db: AsyncSession = Depends(get_db),
+        family: FamilyCreate,
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db),
 ):
     """
     Crete new user.
@@ -45,18 +45,22 @@ async def create_family(
 
 
 @router.post(
-    "/{family_id}/members",
+    "/{family_id}/members/{user_id}",
     dependencies=[Depends(RequireUser([UserType.ADMIN, UserType.CLIENT]))],
     tags=[],
-    response_model=None,
+    response_model=FamilyMemberModel,  # TODO no response?
     responses=None,
     status_code=status.HTTP_200_OK,
     summary="Add member",
     response_description="Successful Response",
 )
-async def add_member(family_id: int, user_id: int, db: AsyncSession = Depends(get_db)):
+async def add_member(
+        family_id: int,
+        user_id: int,
+        db: AsyncSession = Depends(get_db)
+):
     """
-    Add member to familys.
+    Add member to families.
     """
     return await family_repo.add_member(db, family_id, user_id)
 
