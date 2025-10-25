@@ -40,23 +40,9 @@ def test_add_member(client: TestClient, cookies: Cookies):
     assert response.status_code == 200
 
 def test_delete_member(client: TestClient, cookies: Cookies):
-    # family_data = {"name": "test_family"}
-    # family_response = client.post("/families", 
-    #                               json=family_data, 
-    #                               cookies=cookies["client"])
-    # assert family_response.status_code == 201
-    # family = family_response.json()
-    # family_id = family["id"]
-
-    # add_response = client.post(
-    #     f"/families/{family_id}/members/3",
-    #     cookies=cookies["client"],
-    # )
-    # assert add_response.status_code == 200
-
     delete_response = client.delete(
-        f"/families/{1}/members/{4}",
-        cookies=cookies["client"],
+            f"/families/{1}/members/{4}",
+            cookies=cookies["client"],
     )
     
     assert delete_response.status_code == 200

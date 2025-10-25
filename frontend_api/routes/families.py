@@ -70,7 +70,7 @@ async def add_member(
 
 @router.delete(
     "/{family_id}/members/{user_id}",
-    dependencies=[Depends(RequireUser([UserType.ADMIN, UserType.CLIENT]))],
+    dependencies=[],
     tags=[],
     response_model=Delete, 
     responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
