@@ -29,8 +29,18 @@ async def create_family(
 async def add_member(
         db: AsyncSession,
         family_id: int,
-        user_id: int
-):
+        user_id: int,
+        current_user: User
+):    
+    query = select(Family).where(
+        (Family.id == family_id) & (Family.user_id == current_user.id)
+        )
+    main_user = await db.scalar(query)
+    if main_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant add member to this family fucker"
+        )
+
     query = select(Family).where(Family.id == family_id)
     family = await db.scalar(query)
     if family is None:
@@ -67,8 +77,18 @@ async def add_member(
 async def delete_member(
         db: AsyncSession,
         family_id: int,
-        user_id: int
+        user_id: int,
+        current_user: User
 ):
+    query = select(Family).where(
+        (Family.id == family_id) & (Family.user_id == current_user.id)
+        )
+    main_user = await db.scalar(query)
+    if main_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant delete member from this family fucker"
+        )
+    
     query = select(Family).where(Family.id == family_id)
     family = await db.scalar(query)
     if family is None:

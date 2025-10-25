@@ -59,12 +59,13 @@ async def create_family(
 async def add_member(
         family_id: int,
         user_id: int,
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
         db: AsyncSession = Depends(get_db)
 ):
     """
     Add member to families.
     """
-    return await family_repo.add_member(db, family_id, user_id)
+    return await family_repo.add_member(db, family_id, user_id, current_user)
 
 
 @router.delete(
@@ -80,12 +81,13 @@ async def add_member(
 async def delete_member(
         family_id: int,
         user_id: int,
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
         db: AsyncSession = Depends(get_db)
 ):
     """
     Add member to families.
     """
-    return await family_repo.delete_member(db, family_id, user_id)
+    return await family_repo.delete_member(db, family_id, user_id, current_user)
 
 
 
