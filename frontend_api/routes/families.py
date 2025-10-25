@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from app_common.database import get_db
 from app_common.models.user import User, UserType
 from app_common.schemas.default import (
+    Delete,
     Forbidden,
+    NotFound,
     Unauthorized,
 )
 from app_common.schemas.family import FamilyCreate, FamilyModel, FamilyMemberModel
@@ -48,7 +50,7 @@ async def create_family(
     "/{family_id}/members/{user_id}",
     dependencies=[Depends(RequireUser([UserType.ADMIN, UserType.CLIENT]))],
     tags=[],
-    response_model=FamilyMemberModel,  # TODO no response?
+    response_model=FamilyMemberModel, 
     responses=None,
     status_code=status.HTTP_200_OK,
     summary="Add member",
@@ -65,11 +67,35 @@ async def add_member(
     return await family_repo.add_member(db, family_id, user_id)
 
 
+@router.delete(
+    "/{family_id}/members/{user_id}",
+    dependencies=[Depends(RequireUser([UserType.ADMIN, UserType.CLIENT]))],
+    tags=[],
+    response_model=Delete, 
+    responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
+    status_code=status.HTTP_200_OK,
+    summary="Delete member",
+    response_description="Successful Response",
+)
+async def delete_member(
+        family_id: int,
+        user_id: int,
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    Add member to families.
+    """
+    return await family_repo.delete_member(db, family_id, user_id)
+
+
+
+
+
 """
  * create family
  * add user to family
- * add your device to family, check if it's your device
  * remove user from family
+ * add your device to family, check if it's your device
  * remove device from family, check if it's your device
  * accept / decline family request
  * remove yourself from family

@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from schemas.user import UserCreate
+from app_common.schemas.user import UserCreate
 from tests.database.fixture_client import Cookies, get_example
 
 
