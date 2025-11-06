@@ -3,13 +3,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from app_common.database import get_db
+from app_common.models.user import User, UserType
+from app_common.schemas.default import (
+    Delete,
+    Forbidden,
+    LimitedResponse,
+    NotFound,
+    Unauthorized,
+)
+from app_common.schemas.user import UserCreate, UserModel
 from frontend_api.docs import Tags
-from app_common.models.user import UserType, User
-from frontend_api.repos import user_repo, auth_repo
-from app_common.schemas.default import Unauthorized, Forbidden, LimitedResponse, NotFound, Delete
-from app_common.schemas.user import UserModel
-from frontend_api.utils.auth.auth import RequireUser
+from frontend_api.repos import auth_repo, user_repo
 from frontend_api.schemas.auth import LoginModel, PasswordRecoverModel
+from frontend_api.utils.auth.auth import RequireUser
 
 router = APIRouter(
     prefix="/users",
@@ -17,18 +23,20 @@ router = APIRouter(
     responses={
         status.HTTP_401_UNAUTHORIZED: {"model": Unauthorized},
         status.HTTP_403_FORBIDDEN: {"model": Forbidden},
-    }
+    },
 )
 
 
-@router.post("/login",
-             dependencies=None,
-             tags=None,
-             response_model=None,
-             responses=None,
-             status_code=status.HTTP_200_OK,
-             summary="login",
-             response_description="Successful Response")
+@router.post(
+    "/login",
+    dependencies=None,
+    tags=None,
+    response_model=None,
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="login",
+    response_description="Successful Response",
+)
 async def login(
         login: LoginModel,
         db: AsyncSession = Depends(get_db),
@@ -39,14 +47,16 @@ async def login(
     return await auth_repo.login(db, login)
 
 
-@router.post("/logout",
-             dependencies=None,
-             tags=None,
-             response_model=None,
-             responses=None,
-             status_code=status.HTTP_200_OK,
-             summary="logout",
-             response_description="Successful Response")
+@router.post(
+    "/logout",
+    dependencies=None,
+    tags=None,
+    response_model=None,
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="logout",
+    response_description="Successful Response",
+)
 async def logout():
     """
     Logout.
@@ -54,14 +64,16 @@ async def logout():
     return await auth_repo.logout()
 
 
-@router.post("/recover",
-             dependencies=None,
-             tags=None,
-             response_model=PasswordRecoverModel,
-             responses=None,
-             status_code=status.HTTP_200_OK,
-             summary="recover password",
-             response_description="Successful Response")
+@router.post(
+    "/recover",
+    dependencies=None,
+    tags=None,
+    response_model=PasswordRecoverModel,
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="recover password",
+    response_description="Successful Response",
+)
 async def recover(
         login: str,
         db: AsyncSession = Depends(get_db),
@@ -72,14 +84,16 @@ async def recover(
     return await auth_repo.recover(db, login)
 
 
-@router.get("/current",
-            dependencies=None,
-            tags=None,
-            response_model=UserModel,
-            responses=None,
-            status_code=status.HTTP_200_OK,
-            summary="get current user",
-            response_description="Successful Response")
+@router.get(
+    "/current",
+    dependencies=None,
+    tags=None,
+    response_model=UserModel,
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="get current user",
+    response_description="Successful Response",
+)
 async def current(
         user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN]))
 ):
@@ -89,19 +103,21 @@ async def current(
     return user
 
 
-@router.get("",
-            dependencies=[],
-            tags=None,
-            response_model=LimitedResponse[UserModel],
-            responses=None,
-            status_code=status.HTTP_200_OK,
-            summary="get users",
-            response_description="Successful Response")
+@router.get(
+    "",
+    dependencies=[],
+    tags=None,
+    response_model=LimitedResponse[UserModel],
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="get users",
+    response_description="Successful Response",
+)
 async def get_users(
         offset: int = Query(default=0, ge=0),
         limit: int = Query(default=100, ge=0, le=500),
         user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
-        db=Depends(get_db)
+        db=Depends(get_db),
 ):
     """
     Get users.
@@ -109,14 +125,16 @@ async def get_users(
     return await user_repo.get_users(db, user, offset, limit)
 
 
-@router.delete("",
-               dependencies=[Depends(RequireUser(UserType.ADMIN))],
-               tags=None,
-               response_model=Delete,
-               responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
-               status_code=status.HTTP_200_OK,
-               summary="delete users",
-               response_description="Successful Response")
+@router.delete(
+    "/{user_id}",
+    dependencies=[Depends(RequireUser(UserType.ADMIN))],
+    tags=None,
+    response_model=Delete,
+    responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
+    status_code=status.HTTP_200_OK,
+    summary="delete users",
+    response_description="Successful Response",
+)
 async def delete_user(
         user_id: int,
         db=Depends(get_db)
@@ -125,6 +143,27 @@ async def delete_user(
     Delete user - admin.
     """
     return await user_repo.delete_user(db, user_id)
+
+
+@router.post(
+    "",
+    dependencies=[],
+    tags=[],
+    response_model=UserModel,
+    responses=None,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create user",
+    response_description="Successful Response",
+)
+async def create_user(
+        user: UserCreate,
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    Crete new user.
+    """
+    return await user_repo.create_user(db, user)
+
 
 # TODO add email verification
 # TODO add google login
