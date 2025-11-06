@@ -22,3 +22,6 @@ class DeviceModel(BaseModel):
 @omit("user_id", "privacy", "battery")
 class DeviceSettings(DeviceModel):
     pass
+
+class DeviceConnectInit(BaseModel):
+    cert: str

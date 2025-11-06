@@ -41,7 +41,7 @@ async def create_family(
         db: AsyncSession = Depends(get_db),
 ):
     """
-    Crete new user.
+    Create new family.
     """
     return await family_repo.create_family(db, family, current_user)
 

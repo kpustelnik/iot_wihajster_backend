@@ -25,6 +25,8 @@ services:
       context: .
       dockerfile: ./frontend_api/Dockerfile
     image: iot/frontend_api
+    volumes:
+      - ./certs:/certs
     environment:
       - POSTGRES_HOSTNAME=postgres
       - POSTGRES_USER=${POSTGRES_USER}
@@ -43,6 +45,8 @@ services:
       context: .
       dockerfile: ./device_api/Dockerfile
     image: iot/device_api
+    volumes:
+      - ./certs:/certs
     environment:
       - POSTGRES_HOSTNAME=postgres
       - POSTGRES_USER=${POSTGRES_USER}

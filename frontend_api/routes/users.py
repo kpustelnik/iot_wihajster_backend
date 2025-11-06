@@ -160,7 +160,7 @@ async def create_user(
         db: AsyncSession = Depends(get_db)
 ):
     """
-    Crete new user.
+    Create new user.
     """
     return await user_repo.create_user(db, user)
 
