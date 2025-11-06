@@ -48,6 +48,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     depends_on:
+      frontend_api:
+        condition: service_healthy
       db:
         condition: service_healthy
     links:
