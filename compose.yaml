@@ -35,7 +35,7 @@ services:
     links:
       - db
     ports:
-      - 3000:80
+      - 3999:80
   device_api:
     container_name: device_api
     hostname: device_api
