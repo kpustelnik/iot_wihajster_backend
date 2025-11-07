@@ -25,3 +25,9 @@ class DeviceSettings(DeviceModel):
 
 class DeviceConnectInit(BaseModel):
     cert: str
+
+class DeviceConnectConfirm(BaseModel):
+    data: str
+    iv: str
+    key: str
+    cert: str
