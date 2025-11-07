@@ -98,3 +98,18 @@ def test_leave_family_success(client: TestClient, cookies: Cookies):
     data = leave_resp.json()
     assert data["deleted"] == 1
     assert data["detail"] == "Left family."
+
+
+def test_add_device_success(client: TestClient, cookies: Cookies):
+
+    family_id = 1
+
+    me_resp = client.get("/users/current", cookies=cookies["client"])
+    assert me_resp.status_code == 200
+    # me_id = me_resp.json()["id"] -> me_id = 2
+    
+    add_device_resp = client.post(f"/families/{family_id}/devices/{3}", cookies=cookies["client"])
+    assert add_device_resp.status_code == 200
+    data = add_device_resp.json()
+    assert data["family_id"] == family_id
+    assert data["device_id"] == 3  

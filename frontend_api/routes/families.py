@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from app_common.database import get_db
+from app_common.models.family import FamilyDevice
 from app_common.models.user import User, UserType
 from app_common.schemas.default import (
     Delete,
@@ -10,7 +11,7 @@ from app_common.schemas.default import (
     NotFound,
     Unauthorized,
 )
-from app_common.schemas.family import FamilyCreate, FamilyModel, FamilyMemberModel
+from app_common.schemas.family import FamilyCreate, FamilyDeviceModel, FamilyModel, FamilyMemberModel
 from frontend_api.docs import Tags
 from frontend_api.repos import family_repo
 from frontend_api.utils.auth.auth import RequireUser
@@ -130,6 +131,28 @@ async def leave_family(
     Leave family.
     """
     return await family_repo.leave_family(db, family_id, current_user)
+
+
+@router.post(
+    "/{family_id}/devices/{device_id}",
+    dependencies=[],
+    tags=[],
+    response_model=FamilyDeviceModel, 
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="Add device",
+    response_description="Successful Response",
+)
+async def add_device(
+        family_id: int,
+        device_id: int,
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    Add device to family.
+    """
+    return await family_repo.add_device(db, family_id, device_id, current_user)
 
 
 """
