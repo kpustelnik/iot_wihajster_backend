@@ -58,7 +58,7 @@ async def add_member(
         )
 
     query = select(FamilyMember).where(
-        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user_id) 
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user_id)
     )
     user_in_family = await db.scalar(query)
     if user_in_family is not None:
