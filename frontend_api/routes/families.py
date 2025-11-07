@@ -13,6 +13,7 @@ from app_common.schemas.default import (
 )
 from app_common.schemas.device import DeviceModel
 from app_common.schemas.family import FamilyCreate, FamilyDeviceModel, FamilyModel, FamilyMemberModel
+from app_common.schemas.user import UserModel
 from frontend_api.docs import Tags
 from frontend_api.repos import family_repo
 from frontend_api.utils.auth.auth import RequireUser
@@ -166,7 +167,7 @@ async def add_device(
     summary="get devices in family",
     response_description="Successful Response",
 )
-async def get_users(
+async def get_devices(
         family_id: int,
         offset: int = Query(default=0, ge=0),
         limit: int = Query(default=100, ge=0, le=500),
@@ -174,11 +175,32 @@ async def get_users(
         db=Depends(get_db),
 ):
     """
-    Get users.
+    Get devices in selected family.
     """
     return await family_repo.get_devices(db, family_id, user, offset, limit)
 
 
+@router.get(
+    "/{family_id}/members",
+    dependencies=[],
+    tags=None,
+    response_model=LimitedResponse[UserModel],
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="get members of family",
+    response_description="Successful Response",
+)
+async def get_members(
+        family_id: int,
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=0, le=500),
+        user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+        db=Depends(get_db),
+):
+    """
+    Get members in selected family.
+    """
+    return await family_repo.get_members(db, family_id, user, offset, limit)
 
 
 """

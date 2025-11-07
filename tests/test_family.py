@@ -101,12 +101,9 @@ def test_leave_family_success(client: TestClient, cookies: Cookies):
 
 
 def test_add_device_success(client: TestClient, cookies: Cookies):
-
     family_id = 1
-
     me_resp = client.get("/users/current", cookies=cookies["client"])
     assert me_resp.status_code == 200
-    # me_id = me_resp.json()["id"] -> me_id = 2
     
     add_device_resp = client.post(f"/families/{family_id}/devices/{3}", cookies=cookies["client"])
     assert add_device_resp.status_code == 200
@@ -122,3 +119,12 @@ def test_get_devices(client: TestClient, cookies: Cookies):
     assert data["total_count"] == 2
     ids = sorted(d["id"] for d in data["content"])
     assert ids == [1, 2]
+
+
+def test_get_members(client: TestClient, cookies: Cookies):
+    resp = client.get("/families/1/members?offset=0&limit=10", cookies=cookies["client"])
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["total_count"] == 2
+    ids = sorted(d["id"] for d in data["content"])
+    assert ids == [2, 4]

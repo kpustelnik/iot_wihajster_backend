@@ -286,3 +286,51 @@ async def get_devices(
     return LimitedResponse(
         total_count=count, offset=offset, limit=limit, content=[*devices]
     )
+
+
+async def get_members(
+        db: AsyncSession,
+        family_id: int,
+        user: User,
+        offset: int,
+        limit: int
+) -> LimitedResponse[DeviceModel]:
+    
+    query = select(FamilyMember).where(
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user.id)
+    )
+    user = await db.scalar(query)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not in this family"
+        )
+
+    query = select(Family).where(Family.id == family_id)
+    family = await db.scalar(query)
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Family not found"
+        )
+
+    count_query = (
+        select(func.count())
+        .select_from(FamilyMember)
+        .where(FamilyMember.family_id == family_id)
+    )
+
+    query = (
+        select(User)
+        .join(FamilyMember, User.id == FamilyMember.user_id)
+        .where(FamilyMember.family_id == family_id)
+        .order_by(User.id)
+        .offset(offset)
+        .limit(limit)
+    )
+
+    count = await db.scalar(count_query)
+
+    users = (await db.scalars(query)).all()
+
+    return LimitedResponse(
+        total_count=count, offset=offset, limit=limit, content=[*users]
+    )
