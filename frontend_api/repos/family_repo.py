@@ -1,14 +1,15 @@
 from sqlite3 import IntegrityError
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from app_common.models.device import Device
 from app_common.models.family import Family, FamilyDevice, FamilyMember, FamilyStatus
 from app_common.models.user import User
-from app_common.schemas.default import Delete
+from app_common.schemas.default import Delete, LimitedResponse
+from app_common.schemas.device import DeviceModel
 from app_common.schemas.family import FamilyCreate
 
 
@@ -237,3 +238,51 @@ async def add_device(
     except IntegrityError as e:
         await db.rollback()
         raise ValueError(f"Database error: {str(e)}")
+    
+
+async def get_devices(
+        db: AsyncSession,
+        family_id: int,
+        user: User,
+        offset: int,
+        limit: int
+) -> LimitedResponse[DeviceModel]:
+    
+    query = select(FamilyMember).where(
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user.id)
+    )
+    user = await db.scalar(query)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not in this family"
+        )
+
+    query = select(Family).where(Family.id == family_id)
+    family = await db.scalar(query)
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Family not found"
+        )
+
+    count_query = (
+        select(func.count())
+        .select_from(FamilyDevice)
+        .where(FamilyDevice.family_id == family_id)
+    )
+
+    query = (
+        select(Device)
+        .join(FamilyDevice, Device.id == FamilyDevice.device_id)
+        .where(FamilyDevice.family_id == family_id)
+        .order_by(Device.id)
+        .offset(offset)
+        .limit(limit)
+    )
+
+    count = await db.scalar(count_query)
+
+    devices = (await db.scalars(query)).all()
+
+    return LimitedResponse(
+        total_count=count, offset=offset, limit=limit, content=[*devices]
+    )

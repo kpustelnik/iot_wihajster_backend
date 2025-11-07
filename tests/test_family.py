@@ -113,3 +113,12 @@ def test_add_device_success(client: TestClient, cookies: Cookies):
     data = add_device_resp.json()
     assert data["family_id"] == family_id
     assert data["device_id"] == 3  
+
+
+def test_get_devices(client: TestClient, cookies: Cookies):
+    resp = client.get("/families/1/devices?offset=0&limit=10", cookies=cookies["client"])
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["total_count"] == 2
+    ids = sorted(d["id"] for d in data["content"])
+    assert ids == [1, 2]

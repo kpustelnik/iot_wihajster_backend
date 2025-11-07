@@ -1,16 +1,17 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from app_common.database import get_db
-from app_common.models.family import FamilyDevice
 from app_common.models.user import User, UserType
 from app_common.schemas.default import (
     Delete,
     Forbidden,
+    LimitedResponse,
     NotFound,
     Unauthorized,
 )
+from app_common.schemas.device import DeviceModel
 from app_common.schemas.family import FamilyCreate, FamilyDeviceModel, FamilyModel, FamilyMemberModel
 from frontend_api.docs import Tags
 from frontend_api.repos import family_repo
@@ -153,6 +154,31 @@ async def add_device(
     Add device to family.
     """
     return await family_repo.add_device(db, family_id, device_id, current_user)
+
+
+@router.get(
+    "/{family_id}/devices",
+    dependencies=[],
+    tags=None,
+    response_model=LimitedResponse[DeviceModel],
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="get devices in family",
+    response_description="Successful Response",
+)
+async def get_users(
+        family_id: int,
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=0, le=500),
+        user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+        db=Depends(get_db),
+):
+    """
+    Get users.
+    """
+    return await family_repo.get_devices(db, family_id, user, offset, limit)
+
+
 
 
 """
