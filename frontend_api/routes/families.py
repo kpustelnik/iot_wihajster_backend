@@ -203,6 +203,28 @@ async def get_members(
     return await family_repo.get_members(db, family_id, user, offset, limit)
 
 
+@router.delete(
+    "/{family_id}/devices/{device_id}",
+    dependencies=[],
+    tags=[],
+    response_model=Delete, 
+    responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
+    status_code=status.HTTP_200_OK,
+    summary="Delete device from family",
+    response_description="Successful Response",
+)
+async def delete_family_device(
+        family_id: int,
+        device_id: int,
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete device from family.
+    """
+    return await family_repo.delete_family_device(db, family_id, device_id, current_user)
+
+
 """
  * create family
  * add user to family

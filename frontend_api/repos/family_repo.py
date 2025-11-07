@@ -334,3 +334,68 @@ async def get_members(
     return LimitedResponse(
         total_count=count, offset=offset, limit=limit, content=[*users]
     )
+
+
+async def delete_family_device(
+        db: AsyncSession,
+        family_id: int,
+        device_id: int,
+        current_user: User
+):
+    # query = select(Family).where(
+    #     (Family.id == family_id) & (Family.user_id == current_user.id)
+    #     )
+    # main_user = await db.scalar(query)
+    # if main_user is None:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant delete member from this family fucker"
+    #     )
+    
+    query = select(Family).where(Family.id == family_id)
+    family = await db.scalar(query)
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Family not found"
+        )
+    
+    query = select(Device).where(Device.id == device_id)
+    device = await db.scalar(query)
+    if device is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
+        )
+    
+    query = select(FamilyMember).where(
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == current_user.id)
+    )
+    family_member = await db.scalar(query)
+    if family_member is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="User not in selected family"
+        )
+    
+    query = select(Device).where(
+        (Device.id == device_id) & (Device.user_id == current_user.id)
+    )
+    user_owns_device = await db.scalar(query)
+    if user_owns_device is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Device don't belong to user"
+        )
+    
+    query = select(FamilyDevice).where(
+        (FamilyDevice.family_id == family_id) & (FamilyDevice.device_id == device_id)
+    )
+    family_device = await db.scalar(query)
+    if family_device is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Device not in selected family"
+        )
+    
+    try:
+        await db.delete(family_device)
+        await db.commit()
+        return Delete(deleted=1, detail="Deleted family device.")
+    except IntegrityError as e:
+        await db.rollback()
+        raise ValueError(f"Database error: {str(e)}")
