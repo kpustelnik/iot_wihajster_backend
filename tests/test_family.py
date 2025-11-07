@@ -49,3 +49,30 @@ def test_delete_member(client: TestClient, cookies: Cookies):
     data = delete_response.json()
     assert data["deleted"] == 1
     assert data["detail"] == "Deleted family member."
+
+
+def test_delete_family_success(client: TestClient, cookies: Cookies):
+    create_resp = client.post("/families", json={"name": "to_delete"}, cookies=cookies["client"])
+    assert create_resp.status_code == 201
+    family_id = create_resp.json()["id"]
+
+    delete_resp = client.delete(f"/families/{family_id}", cookies=cookies["client"])
+    assert delete_resp.status_code == 201
+    data = delete_resp.json()
+    assert data["deleted"] == 1
+    assert data["detail"] == "Deleted family."
+
+
+def test_delete_family_unauthorized(client: TestClient, cookies: Cookies):
+    create_resp = client.post("/families", json={"name": "private"}, cookies=cookies["client"])
+    assert create_resp.status_code == 201
+    family_id = create_resp.json()["id"]
+
+    # Wybierz innego użytkownika jeśli dostępny
+    other_cookie_key = next((k for k in cookies.keys() if k != "client"), None)
+    if other_cookie_key is None:
+        return  # Brak drugiego użytkownika w fixturze
+
+    delete_resp = client.delete(f"/families/{family_id}", cookies=cookies[other_cookie_key])
+    assert delete_resp.status_code == 401
+    assert delete_resp.json()["detail"] == "You cant delete this family fucker"
