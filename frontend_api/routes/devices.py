@@ -46,6 +46,7 @@ async def init_device_connection(
         ca_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
     ca_public_key = ca_cert.public_key()
 
+    print(req.cert)
     cert = x509.load_pem_x509_certificate(req.cert.encode("utf-8"), default_backend())
 
     try:
@@ -77,7 +78,11 @@ async def init_device_connection(
     # TODO: Also insert information about the user id?
     # The device could then refuse to accept connection (requiring it to perform a hardware settings reset before authenticating)
     # This is to make it to disallow anonymous connections
-    payload = f'{challenge['pin']}:{challenge_uuid}'
+    import json
+    payload = json.dumps({
+        'pin': challenge['pin'],
+        'challenge': str(challenge_uuid)
+    })
     with open("/certs/ca.key", "rb") as f:
         ca_private_key = serialization.load_pem_private_key(
             f.read(),
@@ -91,8 +96,6 @@ async def init_device_connection(
     )
     print(signature)
 
-    import json
-    import base64
     data = json.dumps({
         "data": payload,
         "signature": signature.hex()
@@ -208,10 +211,12 @@ async def confirm_device_connection(
     print("Retrieved message:", decoded_message)
 
     data_msg = json.loads(decoded_message)
+    
+    pin = int(data_msg['pin'])
+    challenge_uuid = data_msg['challenge']
+    msg = data_msg.get('msg', 0)
+    print("Received msg from the device:", msg)
 
-    pin_str, challenge_uuid_str = data_msg['data'].split(":")
-    pin = int(pin_str)
-    challenge_uuid = challenge_uuid_str
     if challenge_uuid not in challenges:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown challenge"
