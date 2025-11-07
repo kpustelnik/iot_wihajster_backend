@@ -128,3 +128,19 @@ def test_get_members(client: TestClient, cookies: Cookies):
     assert data["total_count"] == 2
     ids = sorted(d["id"] for d in data["content"])
     assert ids == [2, 4]
+
+
+def test_delete_family_device(client: TestClient, cookies: Cookies):
+    family_id = 1
+    
+    add_device_resp = client.post(f"/families/{family_id}/devices/{3}", cookies=cookies["client"])
+    assert add_device_resp.status_code == 200
+    data = add_device_resp.json()
+    assert data["family_id"] == family_id
+    assert data["device_id"] == 3  
+
+    delete_resp = client.delete(f"/families/{family_id}/devices/{3}", cookies=cookies["client"])
+    assert delete_resp.status_code == 200
+    data = delete_resp.json()
+    assert data["deleted"] == 1
+    assert data["detail"] == "Deleted family device."
