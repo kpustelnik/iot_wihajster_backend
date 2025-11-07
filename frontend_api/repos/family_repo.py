@@ -150,3 +150,32 @@ async def delete_family(
         await db.rollback()
         raise ValueError(f"Database error: {str(e)}")
 
+
+async def leave_family(
+        db: AsyncSession,
+        family_id: int,
+        current_user: User
+):
+    query = select(Family).where(Family.id == family_id)
+    family = await db.scalar(query)
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Family not found"
+        )
+    
+    query = select(FamilyMember).where(
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == current_user.id)
+        )
+    user = await db.scalar(query)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="You are not in selected family"
+        )
+    
+    try:
+        await db.delete(user)
+        await db.commit()
+        return Delete(deleted=1, detail="Left family.")
+    except IntegrityError as e:
+        await db.rollback()
+        raise ValueError(f"Database error: {str(e)}")

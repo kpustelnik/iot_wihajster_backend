@@ -57,7 +57,7 @@ def test_delete_family_success(client: TestClient, cookies: Cookies):
     family_id = create_resp.json()["id"]
 
     delete_resp = client.delete(f"/families/{family_id}", cookies=cookies["client"])
-    assert delete_resp.status_code == 201
+    assert delete_resp.status_code == 200
     data = delete_resp.json()
     assert data["deleted"] == 1
     assert data["detail"] == "Deleted family."
@@ -68,11 +68,33 @@ def test_delete_family_unauthorized(client: TestClient, cookies: Cookies):
     assert create_resp.status_code == 201
     family_id = create_resp.json()["id"]
 
-    # Wybierz innego użytkownika jeśli dostępny
     other_cookie_key = next((k for k in cookies.keys() if k != "client"), None)
     if other_cookie_key is None:
-        return  # Brak drugiego użytkownika w fixturze
+        return 
 
     delete_resp = client.delete(f"/families/{family_id}", cookies=cookies[other_cookie_key])
     assert delete_resp.status_code == 401
     assert delete_resp.json()["detail"] == "You cant delete this family fucker"
+
+
+def test_leave_family_success(client: TestClient, cookies: Cookies):
+    create_resp = client.post("/families", json={"name": "club"}, cookies=cookies["client"])
+    assert create_resp.status_code == 201
+    family_id = create_resp.json()["id"]
+
+    other_cookie_key = next((k for k in cookies.keys() if k != "client"), None)
+    if other_cookie_key is None:
+        return  
+
+    other_user_resp = client.get("/users/current", cookies=cookies[other_cookie_key])
+    assert other_user_resp.status_code == 200
+    other_user_id = other_user_resp.json()["id"]
+
+    add_resp = client.post(f"/families/{family_id}/members/{other_user_id}", cookies=cookies["client"])
+    assert add_resp.status_code == 200
+
+    leave_resp = client.delete(f"/families/{family_id}/members/", cookies=cookies[other_cookie_key])
+    assert leave_resp.status_code == 200
+    data = leave_resp.json()
+    assert data["deleted"] == 1
+    assert data["detail"] == "Left family."

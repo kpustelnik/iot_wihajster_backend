@@ -96,8 +96,8 @@ async def delete_member(
     tags=[],
     response_model=Delete,
     responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
-    status_code=status.HTTP_201_CREATED,
-    summary="Create family",
+    status_code=status.HTTP_200_OK,
+    summary="delete family",
     response_description="Successful Response",
 )
 async def delete_family(
@@ -106,10 +106,30 @@ async def delete_family(
         db: AsyncSession = Depends(get_db),
 ):
     """
-    Create new family.
+    Delete new family.
     """
     return await family_repo.delete_family(db, family_id, current_user)
 
+
+@router.delete(
+    "/{family_id}/members/",
+    dependencies=[],
+    tags=[],
+    response_model=Delete, 
+    responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
+    status_code=status.HTTP_200_OK,
+    summary="Delete yourself",
+    response_description="Successful Response",
+)
+async def leave_family(
+        family_id: int,
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    Leave family.
+    """
+    return await family_repo.leave_family(db, family_id, current_user)
 
 
 """
