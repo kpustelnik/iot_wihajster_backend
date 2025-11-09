@@ -1,5 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from starlette import status
+import uuid
+import random
+import json
 
 from frontend_api.docs import Tags
 from app_common.schemas.device import DeviceConnectInit, DeviceConnectConfirm
@@ -46,7 +49,6 @@ async def init_device_connection(
         ca_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
     ca_public_key = ca_cert.public_key()
 
-    print(req.cert)
     cert = x509.load_pem_x509_certificate(req.cert.encode("utf-8"), default_backend())
 
     try:
@@ -61,15 +63,12 @@ async def init_device_connection(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect certificate"
         )
     
-    print("Device serial number is", cert.serial_number)
-    print(cert.extensions)
-    print(cert.subject)
+    device_serial_number = cert.subject.get_attributes_for_oid(x509.NameOID.SERIAL_NUMBER)[0].value
+    print("Device serial number is", device_serial_number)
 
-    import uuid
-    import random
     challenge_uuid = uuid.uuid4()
     challenge = {
-        # TODO: Store the actual device serial number
+        'serial_number': device_serial_number,
         # TODO: store the connection init timestamp (to prefer the most recent inits over older ones)
         'pin': random.randint(100000, 999999)
     }
@@ -78,7 +77,6 @@ async def init_device_connection(
     # TODO: Also insert information about the user id?
     # The device could then refuse to accept connection (requiring it to perform a hardware settings reset before authenticating)
     # This is to make it to disallow anonymous connections
-    import json
     payload = json.dumps({
         'pin': challenge['pin'],
         'challenge': str(challenge_uuid)
@@ -166,9 +164,8 @@ async def confirm_device_connection(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect certificate"
         )
     
-    print("Device serial number is", cert.serial_number)
-    print(cert.extensions)
-    print(cert.subject)
+    device_serial_number = cert.subject.get_attributes_for_oid(x509.NameOID.SERIAL_NUMBER)[0].value
+    print("Device serial number is", device_serial_number)
 
     # Decrypt the AES key
     with open("/certs/ca.key", "rb") as f:
@@ -224,7 +221,7 @@ async def confirm_device_connection(
     # TODO: Confirm that the certificate is matching challenged device
     # TODO: Create device credential (?)
     challenge = challenges[challenge_uuid]
-    if challenge['pin'] != pin:
+    if challenge['pin'] != pin or challenge['serial_number'] != device_serial_number:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect response"
         )
