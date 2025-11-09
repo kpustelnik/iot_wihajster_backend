@@ -166,7 +166,7 @@ async def leave_family(
         )
     
     query = select(FamilyMember).where(
-        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == current_user.id)
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == current_user.id) & (FamilyMember.status == FamilyStatus.ACCEPTED)
         )
     user = await db.scalar(query)
     if user is None:
@@ -190,7 +190,7 @@ async def add_device(
         current_user: User
 ):    
     query = select(FamilyMember).where(
-        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == current_user.id)
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == current_user.id) & (FamilyMember.status == FamilyStatus.ACCEPTED)
         )
     user = await db.scalar(query)
     if user is None:
@@ -249,7 +249,7 @@ async def get_devices(
 ) -> LimitedResponse[DeviceModel]:
     
     query = select(FamilyMember).where(
-        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user.id)
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user.id) & (FamilyMember.status == FamilyStatus.ACCEPTED)
     )
     user = await db.scalar(query)
     if user is None:
@@ -297,7 +297,7 @@ async def get_members(
 ) -> LimitedResponse[DeviceModel]:
     
     query = select(FamilyMember).where(
-        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user.id)
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user.id) & (FamilyMember.status == FamilyStatus.ACCEPTED)
     )
     user = await db.scalar(query)
     if user is None:
@@ -341,16 +341,7 @@ async def delete_family_device(
         family_id: int,
         device_id: int,
         current_user: User
-):
-    # query = select(Family).where(
-    #     (Family.id == family_id) & (Family.user_id == current_user.id)
-    #     )
-    # main_user = await db.scalar(query)
-    # if main_user is None:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant delete member from this family fucker"
-    #     )
-    
+):    
     query = select(Family).where(Family.id == family_id)
     family = await db.scalar(query)
     if family is None:
@@ -366,7 +357,7 @@ async def delete_family_device(
         )
     
     query = select(FamilyMember).where(
-        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == current_user.id)
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == current_user.id) & (FamilyMember.status == FamilyStatus.ACCEPTED)
     )
     family_member = await db.scalar(query)
     if family_member is None:
@@ -396,6 +387,103 @@ async def delete_family_device(
         await db.delete(family_device)
         await db.commit()
         return Delete(deleted=1, detail="Deleted family device.")
+    except IntegrityError as e:
+        await db.rollback()
+        raise ValueError(f"Database error: {str(e)}")
+
+
+async def accept_invite(
+        db: AsyncSession,
+        family_id: int,
+        user_id: int,
+        current_user: User
+):    
+    query = select(Family).where(Family.id == family_id)
+    family = await db.scalar(query)
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Family not found"
+        )
+    
+    query = select(User).where(User.id == user_id)
+    user = await db.scalar(query)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    query = select(FamilyMember).where(
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user_id) 
+    )
+    member = await db.scalar(query)
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invite not found"
+        )
+    
+    if member.status  == FamilyStatus.ACCEPTED:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="User already in family"
+        )
+    
+    if current_user.id not in (family.user_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant accept this invite"
+        )
+
+    member.status = FamilyStatus.ACCEPTED
+    try:
+        await db.commit()
+        await db.refresh(member)
+        return member
+    except IntegrityError as e:
+        await db.rollback()
+        raise ValueError(f"Database error: {str(e)}")
+    
+
+async def decline_invite(
+        db: AsyncSession,
+        family_id: int,
+        user_id: int,
+        current_user: User
+):    
+    query = select(Family).where(Family.id == family_id)
+    family = await db.scalar(query)
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Family not found"
+        )
+    
+    query = select(User).where(User.id == user_id)
+    user = await db.scalar(query)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    query = select(FamilyMember).where(
+        (FamilyMember.family_id == family_id) & (FamilyMember.user_id == user_id) 
+    )
+    member = await db.scalar(query)
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invite not found"
+        )
+    
+    if member.status  == FamilyStatus.ACCEPTED:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="User already in family"
+        )
+    
+    if current_user.id not in (family.user_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant decline this invite"
+        )
+
+    try:
+        await db.delete(member)
+        await db.commit()
+        return Delete(deleted=1, detail="Deleted invite to family.")
     except IntegrityError as e:
         await db.rollback()
         raise ValueError(f"Database error: {str(e)}")

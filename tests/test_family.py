@@ -93,6 +93,10 @@ def test_leave_family_success(client: TestClient, cookies: Cookies):
     add_resp = client.post(f"/families/{family_id}/members/{other_user_id}", cookies=cookies["client"])
     assert add_resp.status_code == 200
 
+    # accept
+    accept = client.patch(f'/families/{family_id}/members/{other_user_id}/accept', cookies=cookies[other_cookie_key])
+    assert accept.status_code == 200
+
     leave_resp = client.delete(f"/families/{family_id}/members/", cookies=cookies[other_cookie_key])
     assert leave_resp.status_code == 200
     data = leave_resp.json()
@@ -144,3 +148,51 @@ def test_delete_family_device(client: TestClient, cookies: Cookies):
     data = delete_resp.json()
     assert data["deleted"] == 1
     assert data["detail"] == "Deleted family device."
+
+
+def test_accept_invite(client: TestClient, cookies: Cookies):
+    create_resp = client.post("/families", json={"name": "club"}, cookies=cookies["client"])
+    assert create_resp.status_code == 201
+    family_id = create_resp.json()["id"]
+
+    other_cookie_key = next((k for k in cookies.keys() if k != "client"), None)
+    if other_cookie_key is None:
+        return  
+
+    other_user_resp = client.get("/users/current", cookies=cookies[other_cookie_key])
+    assert other_user_resp.status_code == 200
+    other_user_id = other_user_resp.json()["id"]
+
+    add_resp = client.post(f"/families/{family_id}/members/{other_user_id}", cookies=cookies["client"])
+    assert add_resp.status_code == 200
+
+    # accept
+    accept = client.patch(f'/families/{family_id}/members/{other_user_id}/accept', cookies=cookies[other_cookie_key])
+    assert accept.status_code == 200
+
+
+def test_decline_invite_user4_family1(client: TestClient, cookies: Cookies):
+    create_resp = client.post("/families", json={"name": "club"}, cookies=cookies["client"])
+    assert create_resp.status_code == 201
+    family_id = create_resp.json()["id"]
+
+    other_cookie_key = next((k for k in cookies.keys() if k != "client"), None)
+
+    other_user_resp = client.get("/users/current", cookies=cookies[other_cookie_key])
+    assert other_user_resp.status_code == 200
+    other_user_id = other_user_resp.json()["id"]
+
+    add_resp = client.post(f"/families/{family_id}/members/{other_user_id}", cookies=cookies["client"])
+    assert add_resp.status_code == 200
+
+    decline = client.delete(f"/families/{family_id}/members/{other_user_id}/decline", cookies=cookies[other_cookie_key])
+    assert decline.status_code == 200, decline.text
+    data = decline.json()
+    assert data["deleted"] == 1
+    assert data["detail"] == "Deleted invite to family."
+
+    # druga próba 
+    decline_again = client.delete(f"/families/{family_id}/members/{other_user_id}/decline", cookies=cookies[other_cookie_key])
+    assert decline_again.status_code == 422
+    assert decline_again.json()["detail"] == "Invite not found"
+

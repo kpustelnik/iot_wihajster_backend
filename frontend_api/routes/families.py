@@ -225,6 +225,50 @@ async def delete_family_device(
     return await family_repo.delete_family_device(db, family_id, device_id, current_user)
 
 
+@router.patch(
+    "/{family_id}/members/{user_id}/accept",
+    dependencies=[],
+    tags=[],
+    response_model=FamilyMemberModel, 
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="Accept invite",
+    response_description="Successful Response",
+)
+async def accept_invite(
+        family_id: int,
+        user_id: int,
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    Accept invite to family.
+    """
+    return await family_repo.accept_invite(db, family_id, user_id, current_user)
+
+
+@router.delete(
+    "/{family_id}/members/{user_id}/decline",
+    dependencies=[],
+    tags=[],
+    response_model=Delete, 
+    responses={status.HTTP_404_NOT_FOUND: {"model": NotFound}},
+    status_code=status.HTTP_200_OK,
+    summary="Decline invite",
+    response_description="Successful Response",
+)
+async def decline_invite(
+        family_id: int,
+        user_id: int,
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    Decline invite to family.
+    """
+    return await family_repo.decline_invite(db, family_id, user_id, current_user)
+
+
 """
  * create family
  * add user to family
@@ -234,6 +278,7 @@ async def delete_family_device(
  * accept / decline family request
  * remove yourself from family
  * delete family
+ useless:
  * change family name, only the main user
  * change the head of the family, (change main user of the family to someone else, but keep yourself as the member of the family)
 """
