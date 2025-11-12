@@ -15,7 +15,7 @@ description = f'''
 '''
 app = FastAPI(lifespan=lifespan, title="IoT Frontend API", openapi_tags=tags_metadata, description=description)
 
-origins = ["http://localhost:3000", "https://wihajster-front.ivk.pl"] # TODO: Clean
+origins = ["http://localhost:3000", "https://wihajster-front.ivk.pl", "https://kpustelnik.github.io"] # TODO: Clean
 
 app.add_middleware(
     CORSMiddleware,
