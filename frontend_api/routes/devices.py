@@ -5,11 +5,14 @@ import random
 import json
 
 from frontend_api.docs import Tags
-from app_common.schemas.device import DeviceConnectInit, DeviceConnectConfirm
+from frontend_api.repos import device_repo
+from app_common.schemas.device import DeviceConnectInit, DeviceConnectConfirm, DeviceProvision
+
+from app_common.utils.certs.ca import CertificateAuthority
 
 from cryptography import x509
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
 
@@ -28,6 +31,29 @@ router = APIRouter(
     * protected: mangle the gps data
     * public: everybody has access to every data point
 """
+
+
+@router.post(
+    "/provision",
+    dependencies=[],
+    tags=[],
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="Provision device",
+    response_description="Successful Response",
+)
+async def provision_device(
+    req: DeviceProvision,
+):
+    device = await device_repo.create_device()
+
+    ca = CertificateAuthority()
+    device_cert = ca.issue_device_certificate(serial_number=str(device.id))
+    return {
+        'ca_cert': ca.get_ca_pem().decode("utf-8"),
+        'device_cert': device_cert.cert_pem.bytes().decode("utf-8"),
+        'device_key': device_cert.private_key_pem.bytes().decode("utf-8")
+    }
 
 challenges = {}
 @router.post(
@@ -52,18 +78,13 @@ async def init_device_connection(
     cert = x509.load_pem_x509_certificate(req.cert.encode("utf-8"), default_backend())
 
     try:
-        ca_public_key.verify(
-            cert.signature,
-            cert.tbs_certificate_bytes,
-            padding.PKCS1v15(),
-            cert.signature_hash_algorithm
-        )
+        cert.verify_directly_issued_by(ca_cert)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect certificate"
         )
     
-    device_serial_number = cert.subject.get_attributes_for_oid(x509.NameOID.SERIAL_NUMBER)[0].value
+    device_serial_number = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
     print("Device serial number is", device_serial_number)
 
     challenge_uuid = uuid.uuid4()
@@ -89,7 +110,7 @@ async def init_device_connection(
         )
     signature = ca_private_key.sign(
         payload.encode("utf-8"),
-        padding.PKCS1v15(),
+        asym_padding.PKCS1v15(),
         hashes.SHA256()
     )
     print(signature)
@@ -111,8 +132,8 @@ async def init_device_connection(
     # Encrypt AES key using RSA public key
     encrypted_key = cert.public_key().encrypt(
         aes_key,
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+        asym_padding.OAEP(
+            mgf=asym_padding.MGF1(algorithm=hashes.SHA256()),
             algorithm=hashes.SHA256(),
             label=None
         )
@@ -123,12 +144,6 @@ async def init_device_connection(
         'iv': iv.hex(),
         'data': encrypted_data.hex()
     }
-
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography import x509
-from cryptography.hazmat.primitives import padding as sym_padding
 
 
 @router.post(
@@ -153,18 +168,13 @@ async def confirm_device_connection(
     cert = x509.load_pem_x509_certificate(req.cert.encode("utf-8"), default_backend())
 
     try:
-        ca_public_key.verify(
-            cert.signature,
-            cert.tbs_certificate_bytes,
-            padding.PKCS1v15(),
-            cert.signature_hash_algorithm
-        )
+        cert.verify_directly_issued_by(ca_cert)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect certificate"
         )
     
-    device_serial_number = cert.subject.get_attributes_for_oid(x509.NameOID.SERIAL_NUMBER)[0].value
+    device_serial_number = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
     print("Device serial number is", device_serial_number)
 
     # Decrypt the AES key

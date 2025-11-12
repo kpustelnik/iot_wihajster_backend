@@ -10,6 +10,9 @@ from app_common.config import settings
 from frontend_api.routes import router
 from frontend_api.docs import tags_metadata
 
+from app_common.utils.certs.ca import CertificateAuthority
+CertificateAuthority(True) # Initialize the CA
+
 description = f'''
 **Build from:** {os.getenv('BUILD_TIME', "unknown")} rev. {os.getenv("CI_COMMIT_SHORT_SHA", "unknown")}.
 '''
@@ -26,7 +29,6 @@ app.add_middleware(
 )
 
 app.include_router(router)
-
 
 @app.get("/")
 async def root():

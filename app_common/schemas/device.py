@@ -23,6 +23,13 @@ class DeviceModel(BaseModel):
 class DeviceSettings(DeviceModel):
     pass
 
+@omit("id")
+class DeviceCreate(BaseModel):
+    pass
+
+class DeviceProvision(BaseModel):
+    pass
+
 class DeviceConnectInit(BaseModel):
     cert: str
 
