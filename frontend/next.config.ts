@@ -10,7 +10,7 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['wihajster-front.ivk.pl'],
-  /* config options here */
+  output: 'export'
 };
 
 export default withSerwist(nextConfig);
