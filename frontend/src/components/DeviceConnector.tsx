@@ -3,11 +3,11 @@
 import { useState, useContext } from "react";
 import { Button, Typography, Stepper, Step, StepLabel, StepContent, CircularProgress } from "@mui/material";
 
-import BLECharacteristicEnum from "@lib/BLECharacteristicEnum";
-import BLEServiceEnum, { AdvertisedServices, OptionalServices } from "@lib/BLEServiceEnum";
+import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
+import BLEServiceEnum, { AdvertisedServices, OptionalServices } from "@/lib/BLEServiceEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
 
-import axios from '@lib/AxiosClient';
+import axios from '@/lib/AxiosClient';
 
 export default function DeviceConnector({ server, setServer, setSettingsOpen }: {
   server: BluetoothRemoteGATTServer | null,

@@ -2,14 +2,14 @@ import * as React from "react";
 import { Typography, Skeleton, Alert, IconButton } from "@mui/material";
 import EditIcon from '@mui/icons-material/Edit';
 
-import BLEServiceEnum from "@lib/BLEServiceEnum";
-import BLECharacteristicEnum from "@lib/BLECharacteristicEnum";
+import BLEServiceEnum from "@/lib/BLEServiceEnum";
+import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
 import WiFiChangeModal from "./WiFiChangeModal";
 
-import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@lib/WiFiAuthModeEnum";
-import DeviceModeEnum from "@lib/DeviceModeEnum";
-import WiFiStateEnum from "@lib/WiFiStateEnum";
+import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@/lib/WiFiAuthModeEnum";
+import DeviceModeEnum from "@/lib/DeviceModeEnum";
+import WiFiStateEnum from "@/lib/WiFiStateEnum";
 
 export default function DeviceManagementWifi({ server }: {
   server: BluetoothRemoteGATTServer,
