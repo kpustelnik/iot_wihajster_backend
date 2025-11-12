@@ -2,9 +2,9 @@ import React from 'react';
 import { Button, Typography, Box, FormControl, RadioGroup, FormControlLabel, Radio, CircularProgress, Alert } from '@mui/material';
 import CustomModal from './CustomModal';
 
-import DeviceModeEnum from "@/../lib/DeviceModeEnum";
-import BLEServiceEnum from "@/../lib/BLEServiceEnum";
-import BLECharacteristicEnum from "@/../lib/BLECharacteristicEnum";
+import DeviceModeEnum from "@lib/DeviceModeEnum";
+import BLEServiceEnum from "@lib/BLEServiceEnum";
+import BLECharacteristicEnum from "@lib/BLECharacteristicEnum";
 
 import { BluetoothQueueContext } from '@/components/BluetoothQueueProvider';
 

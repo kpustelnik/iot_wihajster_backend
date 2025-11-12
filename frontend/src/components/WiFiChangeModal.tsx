@@ -3,9 +3,9 @@ import { Typography, Box, Button, CircularProgress, TextField, FormControl, Inpu
 
 import { BluetoothQueueContext } from '@/components/BluetoothQueueProvider';
 
-import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@/../lib/WiFiAuthModeEnum";
-import BLEServiceEnum from "@/../lib/BLEServiceEnum";
-import BLECharacteristicEnum from "@/../lib/BLECharacteristicEnum";
+import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@lib/WiFiAuthModeEnum";
+import BLEServiceEnum from "@lib/BLEServiceEnum";
+import BLECharacteristicEnum from "@lib/BLECharacteristicEnum";
 import CustomModal from "./CustomModal"
 
 interface WiFiNetwork {

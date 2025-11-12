@@ -17,7 +17,8 @@
       { "name": "next" }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@lib/*": ["./lib/*"]
     },
     "types": ["@serwist/next/typings", "@types/web-bluetooth"]
   },

@@ -1,8 +1,8 @@
 import * as React from "react";
 import { Typography, Skeleton } from "@mui/material";
 
-import BLEServiceEnum from "@/../lib/BLEServiceEnum";
-import BLECharacteristicEnum from "@/../lib/BLECharacteristicEnum";
+import BLEServiceEnum from "@lib/BLEServiceEnum";
+import BLECharacteristicEnum from "@lib/BLECharacteristicEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
 
 export default function DeviceManagementSensors({ server }: {

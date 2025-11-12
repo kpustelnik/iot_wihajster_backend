@@ -4,10 +4,10 @@ import EditIcon from '@mui/icons-material/Edit';
 
 import DeviceModeChangeModal from "./DeviceModeChangeModal";
 
-import BLEServiceEnum from "@/../lib/BLEServiceEnum";
-import BLECharacteristicEnum from "@/../lib/BLECharacteristicEnum";
+import BLEServiceEnum from "@lib/BLEServiceEnum";
+import BLECharacteristicEnum from "@lib/BLECharacteristicEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
-import DeviceModeEnum from "@/../lib/DeviceModeEnum";
+import DeviceModeEnum from "@lib/DeviceModeEnum";
 
 export default function DeviceManagementInfo({ server, setServer }: {
   server: BluetoothRemoteGATTServer,
