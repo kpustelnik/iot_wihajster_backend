@@ -50,7 +50,7 @@ jobs:
             ${{ runner.os }}-nextjs-${{ hashFiles('frontend/package-lock.json') }}-
 
       - name: Build with Next.js
-        run: npm run build
+        run: cd frontend && npm run build
         env:
           PAGES_BASE_PATH: ${{ steps.setup_pages.outputs.base_path }}
 
