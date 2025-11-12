@@ -16,7 +16,7 @@ class DeviceModel(BaseModel):
     day_end: datetime.time = Field(examples=[datetime.time(hour=6)], default=datetime.time(hour=6))
     privacy: PrivacyLevel = Field(examples=[PrivacyLevel.PRIVATE], default=PrivacyLevel.PRIVATE)
     battery: Optional[int] = Field(examples=[50], default=None)
-    status: SettingsStatus = Field(examples=[SettingsStatus.ACCEPTED])
+    status: SettingsStatus = Field(examples=[SettingsStatus.ACCEPTED], default=SettingsStatus.PENDING)
 
 
 @omit("user_id", "privacy", "battery")
@@ -24,7 +24,7 @@ class DeviceSettings(DeviceModel):
     pass
 
 @omit("id")
-class DeviceCreate(BaseModel):
+class DeviceCreate(DeviceModel):
     pass
 
 class DeviceProvision(BaseModel):

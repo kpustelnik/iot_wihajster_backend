@@ -1,12 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 import uuid
 import random
 import json
 
+from app_common.database import get_db
 from frontend_api.docs import Tags
 from frontend_api.repos import device_repo
-from app_common.schemas.device import DeviceConnectInit, DeviceConnectConfirm, DeviceProvision
+from app_common.schemas.device import DeviceConnectInit, DeviceConnectConfirm, DeviceProvision, DeviceCreate
 
 from app_common.utils.certs.ca import CertificateAuthority
 
@@ -44,14 +46,15 @@ router = APIRouter(
 )
 async def provision_device(
     req: DeviceProvision,
+    db: AsyncSession = Depends(get_db)
 ):
-    device = await device_repo.create_device()
+    device = await device_repo.create_device(db, device=DeviceCreate())
 
     ca = CertificateAuthority()
     device_cert = ca.issue_device_certificate(serial_number=str(device.id))
     return {
         'ca_cert': ca.get_ca_pem().decode("utf-8"),
-        'device_cert': device_cert.cert_pem.bytes().decode("utf-8"),
+        'device_cert': device_cert.cert_chain_pems[0].bytes().decode("utf-8"),
         'device_key': device_cert.private_key_pem.bytes().decode("utf-8")
     }
 
@@ -71,14 +74,12 @@ async def init_device_connection(
 #        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
 #        db: AsyncSession = Depends(get_db),
 ):
-    with open('/certs/ca.crt', "rb") as f:
-        ca_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
-    ca_public_key = ca_cert.public_key()
+    ca = CertificateAuthority()
 
     cert = x509.load_pem_x509_certificate(req.cert.encode("utf-8"), default_backend())
 
     try:
-        cert.verify_directly_issued_by(ca_cert)
+        cert.verify_directly_issued_by(ca.get_ca_cert())
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect certificate"
@@ -161,14 +162,12 @@ async def confirm_device_connection(
 #        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
 #        db: AsyncSession = Depends(get_db),
 ):
-    with open('/certs/ca.crt', "rb") as f:
-        ca_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
-    ca_public_key = ca_cert.public_key()
+    ca = CertificateAuthority()
 
     cert = x509.load_pem_x509_certificate(req.cert.encode("utf-8"), default_backend())
 
     try:
-        cert.verify_directly_issued_by(ca_cert)
+        cert.verify_directly_issued_by(ca.get_ca_cert())
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect certificate"

@@ -1,6 +1,8 @@
 import trustme
 import os
 from app_common.utils.singleton import Singleton
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 
 class CertificateAuthority(metaclass=Singleton):
     def __init__(self, canCreate: bool = False):
@@ -26,9 +28,13 @@ class CertificateAuthority(metaclass=Singleton):
         self.ca.private_key_pem.write_to_path(self.ca_key)
 
     def load_ca(self):
+        with open(self.ca_cert, 'rb') as cert_file:
+            cert_bytes = cert_file.read()
+        with open(self.ca_key, 'rb') as key_file:
+            key_bytes = key_file.read()
         self.ca = trustme.CA.from_pem(
-            cert_pem_path=self.ca_cert,
-            key_pem_path=self.ca_key,
+            cert_bytes=cert_bytes,
+            private_key_bytes=key_bytes,
         )
 
     def issue_device_certificate(self, serial_number: str):
@@ -42,3 +48,6 @@ class CertificateAuthority(metaclass=Singleton):
 
     def get_ca_pem(self) -> bytes:
         return self.ca.cert_pem.bytes()
+    
+    def get_ca_cert(self) -> x509.Certificate:
+        return x509.load_pem_x509_certificate(self.get_ca_pem(), default_backend())

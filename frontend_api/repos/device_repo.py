@@ -7,13 +7,14 @@ from app_common.schemas.device import DeviceCreate
 
 
 async def create_device(
-        db: AsyncSession,
-        device: DeviceCreate
+    db: AsyncSession,
+    device: DeviceCreate
 ):
     try:
         db_device = Device(**device.model_dump())
         db.add(db_device)
         await db.commit()
+        await db.refresh(db_device)
         return db_device
     except IntegrityError as e:
         await db.rollback()
