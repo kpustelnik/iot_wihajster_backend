@@ -6,7 +6,7 @@ import { Button } from "@mui/material";
 export default function Home() {
   return (
     <>
-      <Link href="/device/connect">
+      <Link href="./device/connect">
         <Button variant="contained" color="primary">
           Connect device
         </Button>
