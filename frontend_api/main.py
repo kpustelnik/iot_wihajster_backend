@@ -14,8 +14,9 @@ from app_common.utils.certs.ca import CertificateAuthority
 ca = CertificateAuthority(True) # Initialize the CA
 awsRegistrationCode = os.getenv("AWS_CA_REGISTRATION_CODE", None)
 if awsRegistrationCode is not None and not os.path.exists(f"/certs/servers/CA_{awsRegistrationCode}_cert.crt") :
-    aws_cert = ca.issue_server_certificate(f"CA_{awsRegistrationCode}")
-    aws_cert.cert_pem.write_to_path(f"/certs/servers/CA_{awsRegistrationCode}_cert.crt")
+    aws_cert = ca.issue_server_certificate(awsRegistrationCode)
+    os.makedirs("/certs/servers/", exist_ok=True)
+    aws_cert.cert_chain_pems[0].write_to_path(f"/certs/servers/CA_{awsRegistrationCode}_cert.crt")
     aws_cert.private_key_pem.write_to_path(f"/certs/servers/CA_{awsRegistrationCode}_key.key")
 
 description = f'''
