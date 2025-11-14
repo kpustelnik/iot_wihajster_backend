@@ -37,12 +37,21 @@ class CertificateAuthority(metaclass=Singleton):
             private_key_bytes=key_bytes,
         )
 
+    def issue_server_certificate(self, common_name: str):
+        server_cert = self.ca.issue_cert(
+            common_name=common_name,
+            organization_name="WIHAJSTER",
+            organization_unit_name="Server Certificate",
+            key_type=trustme.KeyType.RSA,
+        )
+        return server_cert
+
     def issue_device_certificate(self, serial_number: str):
         device_cert = self.ca.issue_cert(
-          common_name=serial_number,
-          organization_name="WIHAJSTER",
-          organization_unit_name="Device Certificate",
-          key_type=trustme.KeyType.RSA,
+            common_name=serial_number,
+            organization_name="WIHAJSTER",
+            organization_unit_name="Device Certificate",
+            key_type=trustme.KeyType.RSA,
         )
         return device_cert
 

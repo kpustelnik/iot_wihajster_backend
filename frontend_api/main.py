@@ -11,7 +11,12 @@ from frontend_api.routes import router
 from frontend_api.docs import tags_metadata
 
 from app_common.utils.certs.ca import CertificateAuthority
-CertificateAuthority(True) # Initialize the CA
+ca = CertificateAuthority(True) # Initialize the CA
+awsRegistrationCode = os.getenv("AWS_CA_REGISTRATION_CODE", None)
+if awsRegistrationCode is not None and not os.path.exists(f"/certs/servers/CA_{awsRegistrationCode}_cert.crt") :
+    aws_cert = ca.issue_server_certificate(f"CA_{awsRegistrationCode}")
+    aws_cert.cert_pem.write_to_path(f"/certs/servers/CA_{awsRegistrationCode}_cert.crt")
+    aws_cert.private_key_pem.write_to_path(f"/certs/servers/CA_{awsRegistrationCode}_key.key")
 
 description = f'''
 **Build from:** {os.getenv('BUILD_TIME', "unknown")} rev. {os.getenv("CI_COMMIT_SHORT_SHA", "unknown")}.
