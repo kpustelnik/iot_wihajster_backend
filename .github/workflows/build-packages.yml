@@ -31,6 +31,7 @@ jobs:
 
       - name: Build and push frontend_api image
         uses: docker/build-push-action@v4
+        id: push-frontend
         with:
           context: .
           file: ./frontend_api/Dockerfile
@@ -41,11 +42,12 @@ jobs:
         uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ env.REGISTRY }}/${{ github.repository }}/frontend_api
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.push-frontend.outputs.digest }}
           push-to-registry: true
 
       - name: Build and push device_api image
         uses: docker/build-push-action@v4
+        id: push-backend
         with:
           context: .
           file: ./device_api/Dockerfile
@@ -56,5 +58,5 @@ jobs:
         uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ env.REGISTRY }}/${{ github.repository }}/device_api
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.push-backend.outputs.digest }}
           push-to-registry: true
