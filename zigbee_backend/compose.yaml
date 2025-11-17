@@ -39,3 +39,4 @@ services:
             - ./mqtt_ext/config:/mosquitto/config:rw
             - ./mqtt_ext/data:/mosquitto/data:rw
             - ./mqtt_ext/log:/mosquitto/log:rw
+            - ../certs:/mosquitto/certs:ro
