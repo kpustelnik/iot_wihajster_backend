@@ -1,0 +1,41 @@
+name: WIHAJSTER Backend Services
+services:
+    zigbee2mqtt:
+        container_name: zigbee2mqtt
+        hostname: zigbee2mqtt
+        image: koenkk/zigbee2mqtt:latest-dev
+        restart: unless-stopped
+        network_mode: host
+        privileged: true
+        depends_on:
+            - mqtt_ha
+        volumes:
+            - ./data_z2m:/app/data
+        #    - /run/udev:/run/udev:ro
+        ports:
+            - 8080:8080 # Frontend port
+        environment:
+            - TZ=Europe/Warsaw
+    mqtt_ha: 
+        image: eclipse-mosquitto
+        container_name: mqtt_ha
+        hostname: mqtt_ha
+        #ports:
+        #    - "1883:1883" #default mqtt port
+        #    - "9001:9001" #default mqtt port for websockets
+        volumes:
+            - ./mqtt_ha/config:/mosquitto/config:rw
+            - ./mqtt_ha/data:/mosquitto/data:rw
+            - ./mqtt_ha/log:/mosquitto/log:rw
+        restart: unless-stopped
+    mqtt_ext:
+        image: eclipse-mosquitto
+        container_name: mqtt_ext
+        hostname: mqtt_ext
+        ports:
+            - "2883:1883" #external mqtt port
+            - "9002:9001" #external mqtt port for websockets
+        volumes:
+            - ./mqtt_ext/config:/mosquitto/config:rw
+            - ./mqtt_ext/data:/mosquitto/data:rw
+            - ./mqtt_ext/log:/mosquitto/log:rw
