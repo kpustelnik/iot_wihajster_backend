@@ -103,7 +103,7 @@ async def init_device_connection(
         'pin': challenge['pin'],
         'challenge': str(challenge_uuid)
     })
-    with open("/certs/ca.key", "rb") as f:
+    with open("/certs/ca_key.key", "rb") as f:
         ca_private_key = serialization.load_pem_private_key(
             f.read(),
             password=None,  # or b"your_password" if encrypted
@@ -177,7 +177,7 @@ async def confirm_device_connection(
     print("Device serial number is", device_serial_number)
 
     # Decrypt the AES key
-    with open("/certs/ca.key", "rb") as f:
+    with open("/certs/ca_key.key", "rb") as f:
         ca_private_key = serialization.load_pem_private_key(
             f.read(),
             password=None,  # or b"your_password" if encrypted
