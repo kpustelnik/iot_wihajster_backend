@@ -198,3 +198,5 @@ zigbee_backend/data_z2m/database.db
 zigbee_backend/data_z2m/state.json
 zigbee_backend/mqtt_ha/log
 zigbee_backend/mqtt_ha/data
+mqtt_ext/log
+mqtt_ext/data

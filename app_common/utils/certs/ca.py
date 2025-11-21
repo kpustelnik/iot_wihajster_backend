@@ -60,3 +60,19 @@ class CertificateAuthority(metaclass=Singleton):
     
     def get_ca_cert(self) -> x509.Certificate:
         return x509.load_pem_x509_certificate(self.get_ca_pem(), default_backend())
+    
+
+ca = CertificateAuthority(True) # Initialize the CA
+awsRegistrationCode = os.getenv("AWS_CA_REGISTRATION_CODE", None)
+if awsRegistrationCode is not None and len(awsRegistrationCode) > 0 and not os.path.exists(f"/certs/servers/AWS_{awsRegistrationCode}_cert.crt") :
+    aws_cert = ca.issue_server_certificate(awsRegistrationCode)
+    dir = '/certs/servers'
+    os.makedirs(dir, exist_ok=True)
+    aws_cert.cert_chain_pems[0].write_to_path(f"{dir}/AWS_{awsRegistrationCode}_cert.crt")
+    aws_cert.private_key_pem.write_to_path(f"{dir}/AWS_{awsRegistrationCode}_key.key")
+if not os.path.exists("/certs/mqtt_server.crt"):
+    mqtt_cert = ca.issue_server_certificate("MQTT_Server")
+    dir = '/certs'
+    os.makedirs(dir, exist_ok=True)
+    mqtt_cert.cert_chain_pems[0].write_to_path(f"{dir}/mqtt_server.crt")
+    mqtt_cert.private_key_pem.write_to_path(f"{dir}/mqtt_server.key")

@@ -64,3 +64,16 @@ services:
       - db
     ports:
       - 4000:80
+
+  mqtt_ext:
+      image: eclipse-mosquitto
+      container_name: mqtt_ext
+      hostname: mqtt_ext
+      ports:
+          - "2883:1883" #external mqtt port
+          - "9002:9001" #external mqtt port for websockets
+      volumes:
+          - ./mqtt_ext/config:/mosquitto/config:rw
+          - ./mqtt_ext/data:/mosquitto/data:rw
+          - ./mqtt_ext/log:/mosquitto/log:rw
+          - ./certs:/mosquitto/certs:rw

@@ -5,12 +5,16 @@ from fastapi import FastAPI
 from app_common.config import settings
 from app_common.database import sessionmanager
 
+import asyncio
+from app_common.utils.mqtt_handler import mqtt_runner
+
 logger = logging.getLogger('uvicorn.error')
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await sessionmanager.init_db()
+    asyncio.create_task(mqtt_runner())
     if settings.debug:
         from tests.database.csv_to_db import entries
         session = sessionmanager.session()
