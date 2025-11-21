@@ -14,9 +14,10 @@ services:
     volumes:
       - ./docker_data/db:/data/postgres
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d iot -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -d iot -U $${POSTGRES_USER}"]
       interval: 5s
-      timeout: 10s
+      timeout: 60s
+      start_period: 30s
       retries: 15
 
   frontend_api:
@@ -32,6 +33,7 @@ services:
       - POSTGRES_HOSTNAME=postgres
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - AWS_CA_REGISTRATION_CODE=${AWS_CA_REGISTRATION_CODE}
     depends_on:
       db:
         condition: service_healthy

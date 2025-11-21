@@ -188,4 +188,13 @@ fabric.properties
 # idea folder, uncomment if you don't need it
  .idea
 
-certs/
+# Own
+/certs/
+
+zigbee_backend/data_z2m/log
+zigbee_backend/data_z2m/configuration.yaml
+zigbee_backend/data_z2m/coordinator_backup.json
+zigbee_backend/data_z2m/database.db
+zigbee_backend/data_z2m/state.json
+zigbee_backend/mqtt_ha/log
+zigbee_backend/mqtt_ha/data
