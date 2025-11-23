@@ -6,6 +6,7 @@ import BLEServiceEnum from "@/lib/BLEServiceEnum";
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
 import WiFiChangeModal from "./WiFiChangeModal";
+import LTEChangeModal from "./LTEChangeModal";
 
 import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@/lib/WiFiAuthModeEnum";
 import DeviceModeEnum from "@/lib/DeviceModeEnum";
@@ -19,6 +20,7 @@ export default function DeviceManagementWifi({ server }: {
   const [wifiSSID, setWifiSSID] = React.useState('')
   const [wifiWPA, setWifiWPA] = React.useState(0)
   const [wifiState, setWifiState] = React.useState(0)
+  const [lteEnable, setLteEnable] = React.useState(false);
 
   const [allLoaded, setAllLoaded] = React.useState(false);
 
@@ -54,6 +56,7 @@ export default function DeviceManagementWifi({ server }: {
   }, [server, bluetoothQueueContext]);
 
   const [openWifiModal, setOpenWifiModal] = React.useState(false);
+  const [openLTEModal, setOpenLTEModal] = React.useState(false);
 
   return (
     <>
@@ -84,6 +87,17 @@ export default function DeviceManagementWifi({ server }: {
                   </Typography>
                   <Typography>WPA: {WiFiAuthModeNameEnum[WiFiAuthModeEnum[wifiWPA] as keyof typeof WiFiAuthModeNameEnum]}</Typography>
                   <Typography>WiFi State: {WiFiStateEnum[wifiState]}</Typography>
+
+                  <Typography>
+                    Enable LTE: { lteEnable ? 'YES' : 'NO' } <IconButton onClick={() => { setOpenLTEModal(true); }}><EditIcon /></IconButton>
+                    <LTEChangeModal
+                      open={openLTEModal}
+                      onClose={() => setOpenLTEModal(false)}
+                      server={server}
+                      currentLteEnable={lteEnable}
+                      setCurrentLteEnable={setLteEnable}
+                    />
+                  </Typography>
                 </>
               )
             }

@@ -30,7 +30,7 @@ export default function WiFiChangeModal({ open, onClose, server, currentWiFiSSID
   const [newWifiWPA, setNewWifiWPA] = React.useState<WiFiAuthModeEnum>(currentWiFiWPA);
   const [networks, setNetworks] = React.useState<WiFiNetwork[] | null>(null)
 
-  const [isUpdatingNetwork, setIsUpdatingNetwork] = React.useState(false);
+  const [isUpdating, setIsUpdating] = React.useState(false);
   const [isScanningNetworks, setIsScanningNetworks] = React.useState(false);
 
   // TODO: Add confirmations of changes?
@@ -67,11 +67,11 @@ export default function WiFiChangeModal({ open, onClose, server, currentWiFiSSID
         <Button
           variant="contained"
           sx={{ m: 2 }}
-          endIcon={isUpdatingNetwork ? <CircularProgress size={20} sx={{ color: 'white' }} /> : null}
+          endIcon={isUpdating ? <CircularProgress size={20} sx={{ color: 'white' }} /> : null}
           onClick={
             async () => {
-              if (isUpdatingNetwork) return;
-              setIsUpdatingNetwork(true);
+              if (isUpdating) return;
+              setIsUpdating(true);
 
               const wifiService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.WIFI_SERVICE));
 
@@ -90,7 +90,7 @@ export default function WiFiChangeModal({ open, onClose, server, currentWiFiSSID
               setCurrentWiFiSSID(newWifiSSID);
               setCurrentWiFiWPA(newWifiWPA);
 
-              setIsUpdatingNetwork(false);
+              setIsUpdating(false);
               onClose();
             }
           }
