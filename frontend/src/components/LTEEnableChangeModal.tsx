@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Typography, Box, Button, CircularProgress, Checkbox, FormControlLabel, TextField } from "@mui/material";
+import { Typography, Box, Button, CircularProgress, Checkbox, FormControlLabel, Alert } from "@mui/material";
 
 import { BluetoothQueueContext } from '@/components/BluetoothQueueProvider';
 
@@ -17,13 +17,15 @@ export default function LTEChangeModal({ open, onClose, server, currentLteEnable
   const bluetoothQueueContext = React.useContext(BluetoothQueueContext);
 
   const [newLteEnable, setNewLteEnable] = React.useState(currentLteEnable);
-  const [newSIMPin, setNewSIMPin] = React.useState('');
 
   const [isUpdating, setIsUpdating] = React.useState(false);
 
   return (
     <CustomModal open={open} onClose={onClose}>
       <Typography variant="h6" sx={{ m: 2 }}>Adjust the LTE settings</Typography>
+      <Alert severity="info" sx={{ m: 2 }}>
+        Enabling or disabling the LTE may cause the device to reboot and disconnect.
+      </Alert>
       
       <FormControlLabel control={
         <Checkbox
@@ -31,16 +33,6 @@ export default function LTEChangeModal({ open, onClose, server, currentLteEnable
           onChange={(e) => setNewLteEnable(e.target.checked)}
         />
       } label="Enable LTE" sx={{ m: 2 }} />
-
-      <TextField
-        label='SIM PIN'
-        variant="outlined"
-        sx={{ m: 2 }}
-        value={newSIMPin}
-        onChange={(e) => setNewSIMPin(e.target.value)}
-        defaultValue="****"
-      />
-
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
         <Button variant="contained" sx={{ m: 2 }} onClick={onClose}>Cancel</Button>
         <Button
@@ -52,16 +44,10 @@ export default function LTEChangeModal({ open, onClose, server, currentLteEnable
               if (isUpdating) return;
               setIsUpdating(true);
 
-              const pin = parseInt(newSIMPin.trim());
-
               const lteGpsService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.LTE_GPS_SERVICE));
               
               const lteEnableCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.ENABLE_LTE));
               await bluetoothQueueContext.enqueue(() => lteEnableCharacteristic.writeValueWithResponse(new Uint8Array([newLteEnable ? 1 : 0])));
-
-              // TODO: Move to another modal?
-              const simPinCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.SIM_PIN));
-              await bluetoothQueueContext.enqueue(() => simPinCharacteristic.writeValueWithResponse(new Uint16Array([pin])));
 
               setCurrentLteEnable(newLteEnable);
 

@@ -6,7 +6,8 @@ import BLEServiceEnum from "@/lib/BLEServiceEnum";
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
 import WiFiChangeModal from "./WiFiChangeModal";
-import LTEChangeModal from "./LTEChangeModal";
+import LTEEnableChangeModal from "./LTEEnableChangeModal";
+import SIMPinChangeModal from "./SIMPinChangeModal";
 
 import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@/lib/WiFiAuthModeEnum";
 import DeviceModeEnum from "@/lib/DeviceModeEnum";
@@ -24,6 +25,7 @@ export default function DeviceManagementWifi({ server }: {
 
   const [simIccid, setSimIccid] = React.useState('');
   const [simPinStatus, setSimPinStatus] = React.useState(0);
+  const [simPin, setSimPin] = React.useState(10000);
   const [lteEnable, setLteEnable] = React.useState(false);
 
   const [allLoaded, setAllLoaded] = React.useState(false);
@@ -65,15 +67,20 @@ export default function DeviceManagementWifi({ server }: {
       setLteEnable(enableLteValue.getUint8(0) !== 0);
 
       const simIccidCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.SIM_ICCID));
-      const simIccidValue = await bluetoothQueueContext.enqueue(() => simIccidCharacteristic.readValue());
-      setSimIccid(new TextDecoder().decode(simIccidValue));
+      const simIccidValue = await bluetoothQueueContext.enqueue(() => simIccidCharacteristic.readValue()).catch(() => {});
+      if (simIccidValue != null) setSimIccid(new TextDecoder().decode(simIccidValue));
+
+      const simPinCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.SIM_PIN));
+      const simPinValue = await bluetoothQueueContext.enqueue(() => simPinCharacteristic.readValue());
+      setSimPin(simPinValue.getUint16(0));
 
       setAllLoaded(true);
     })();
   }, [server, bluetoothQueueContext]);
 
   const [openWifiModal, setOpenWifiModal] = React.useState(false);
-  const [openLTEModal, setOpenLTEModal] = React.useState(false);
+  const [openLTEEnableModal, setOpenLTEEnableModal] = React.useState(false);
+  const [openSimPinModal, setOpenSimPinModal] = React.useState(false);
 
   return (
     <>
@@ -105,16 +112,26 @@ export default function DeviceManagementWifi({ server }: {
                   <Typography>WPA: {WiFiAuthModeNameEnum[WiFiAuthModeEnum[wifiWPA] as keyof typeof WiFiAuthModeNameEnum]}</Typography>
                   <Typography>WiFi State: {WiFiStateEnum[wifiState]}</Typography>
 
-                  <Typography>SIM ICCID: {(simIccid != '') ? simIccid : '( NO SIM )'}</Typography>
-                  <Typography>SIM PIN Status: {SIMPinStatusEnum[simPinStatus]}</Typography>
+                  <Typography>SIM ICCID: {(simIccid != '') ? simIccid : '( NONE )'}</Typography>
+                  <Typography>SIM Status: {SIMPinStatusEnum[simPinStatus]}</Typography>
                   <Typography>
-                    Enable LTE: { lteEnable ? 'YES' : 'NO' } <IconButton onClick={() => { setOpenLTEModal(true); }}><EditIcon /></IconButton>
-                    <LTEChangeModal
-                      open={openLTEModal}
-                      onClose={() => setOpenLTEModal(false)}
+                    Enable LTE: { lteEnable ? 'YES' : 'NO' } <IconButton onClick={() => { setOpenLTEEnableModal(true); }}><EditIcon /></IconButton>
+                    <LTEEnableChangeModal
+                      open={openLTEEnableModal}
+                      onClose={() => setOpenLTEEnableModal(false)}
                       server={server}
                       currentLteEnable={lteEnable}
                       setCurrentLteEnable={setLteEnable}
+                    />
+                  </Typography>
+                  <Typography>
+                    PIN: {(simPin > 9999) ? '( NOT SET )' : '****'} <IconButton onClick={() => { setOpenSimPinModal(true); }}><EditIcon /></IconButton>
+                    <SIMPinChangeModal
+                      open={openSimPinModal}
+                      onClose={() => setOpenSimPinModal(false)}
+                      server={server}
+                      currentSIMPin={simPin}
+                      setCurrentSIMPin={setSimPin}
                     />
                   </Typography>
                 </>
