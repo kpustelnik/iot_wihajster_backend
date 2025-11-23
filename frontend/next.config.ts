@@ -11,7 +11,7 @@ const withSerwist = withSerwistInit({
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['wihajster-front.ivk.pl'],
   output: 'export',
-  basePath: '/iot_wihajster_backend'
+  basePath: process.env.PAGES_BASE_PATH ?? ''
 };
 
 export default withSerwist(nextConfig);
