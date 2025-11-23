@@ -20,6 +20,8 @@ export default function DeviceManagementWifi({ server }: {
   const [wifiSSID, setWifiSSID] = React.useState('')
   const [wifiWPA, setWifiWPA] = React.useState(0)
   const [wifiState, setWifiState] = React.useState(0)
+
+  const [simIccid, setSimIccid] = React.useState('');
   const [lteEnable, setLteEnable] = React.useState(false);
 
   const [allLoaded, setAllLoaded] = React.useState(false);
@@ -29,6 +31,7 @@ export default function DeviceManagementWifi({ server }: {
     (async () => {
       const basicInfoService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.BASIC_INFO_SERVICE));
       const wifiService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.WIFI_SERVICE));
+      const lteGpsService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.LTE_GPS_SERVICE));
       
       const deviceModeCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_MODE));
       const deviceModeValue = await bluetoothQueueContext.enqueue(() => deviceModeCharacteristic.readValue());
@@ -50,6 +53,14 @@ export default function DeviceManagementWifi({ server }: {
       }); // TODO: Add cleaning it up after unmounting
       await bluetoothQueueContext.enqueue(() => wifiStateCharacteristic.startNotifications());
       await bluetoothQueueContext.enqueue(() => wifiStateCharacteristic.readValue());
+
+      const enableLteCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.ENABLE_LTE));
+      const enableLteValue = await bluetoothQueueContext.enqueue(() => enableLteCharacteristic.readValue());
+      setLteEnable(enableLteValue.getUint8(0) !== 0);
+
+      const simIccidCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.SIM_ICCID));
+      const simIccidValue = await bluetoothQueueContext.enqueue(() => simIccidCharacteristic.readValue());
+      setSimIccid(new TextDecoder().decode(simIccidValue));
 
       setAllLoaded(true);
     })();
@@ -88,6 +99,7 @@ export default function DeviceManagementWifi({ server }: {
                   <Typography>WPA: {WiFiAuthModeNameEnum[WiFiAuthModeEnum[wifiWPA] as keyof typeof WiFiAuthModeNameEnum]}</Typography>
                   <Typography>WiFi State: {WiFiStateEnum[wifiState]}</Typography>
 
+                  <Typography>SIM ICCID: {(simIccid != '') ? simIccid : '( NO SIM )'}</Typography>
                   <Typography>
                     Enable LTE: { lteEnable ? 'YES' : 'NO' } <IconButton onClick={() => { setOpenLTEModal(true); }}><EditIcon /></IconButton>
                     <LTEChangeModal
