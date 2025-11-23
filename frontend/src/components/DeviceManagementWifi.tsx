@@ -11,6 +11,7 @@ import LTEChangeModal from "./LTEChangeModal";
 import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@/lib/WiFiAuthModeEnum";
 import DeviceModeEnum from "@/lib/DeviceModeEnum";
 import WiFiStateEnum from "@/lib/WiFiStateEnum";
+import SIMPinStatusEnum from "@/lib/SIMPinStatusEnum";
 
 export default function DeviceManagementWifi({ server }: {
   server: BluetoothRemoteGATTServer,
@@ -22,6 +23,7 @@ export default function DeviceManagementWifi({ server }: {
   const [wifiState, setWifiState] = React.useState(0)
 
   const [simIccid, setSimIccid] = React.useState('');
+  const [simPinStatus, setSimPinStatus] = React.useState(0);
   const [lteEnable, setLteEnable] = React.useState(false);
 
   const [allLoaded, setAllLoaded] = React.useState(false);
@@ -53,6 +55,10 @@ export default function DeviceManagementWifi({ server }: {
       }); // TODO: Add cleaning it up after unmounting
       await bluetoothQueueContext.enqueue(() => wifiStateCharacteristic.startNotifications());
       await bluetoothQueueContext.enqueue(() => wifiStateCharacteristic.readValue());
+
+      const simPinStatusCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.SIM_PIN_STATUS));
+      const simPinStatusValue = await bluetoothQueueContext.enqueue(() => simPinStatusCharacteristic.readValue());
+      setSimPinStatus(simPinStatusValue.getUint8(0));
 
       const enableLteCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.ENABLE_LTE));
       const enableLteValue = await bluetoothQueueContext.enqueue(() => enableLteCharacteristic.readValue());
@@ -100,6 +106,7 @@ export default function DeviceManagementWifi({ server }: {
                   <Typography>WiFi State: {WiFiStateEnum[wifiState]}</Typography>
 
                   <Typography>SIM ICCID: {(simIccid != '') ? simIccid : '( NO SIM )'}</Typography>
+                  <Typography>SIM PIN Status: {SIMPinStatusEnum[simPinStatus]}</Typography>
                   <Typography>
                     Enable LTE: { lteEnable ? 'YES' : 'NO' } <IconButton onClick={() => { setOpenLTEModal(true); }}><EditIcon /></IconButton>
                     <LTEChangeModal

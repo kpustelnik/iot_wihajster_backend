@@ -25,7 +25,7 @@ export default function LTEChangeModal({ open, onClose, server, currentLteEnable
     <CustomModal open={open} onClose={onClose}>
       <Typography variant="h6" sx={{ m: 2 }}>Adjust the LTE settings</Typography>
       
-      <FormControlLabel required control={
+      <FormControlLabel control={
         <Checkbox
           checked={newLteEnable}
           onChange={(e) => setNewLteEnable(e.target.checked)}

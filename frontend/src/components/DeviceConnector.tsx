@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useContext } from "react";
-import { Button, Typography, Stepper, Step, StepLabel, StepContent, CircularProgress } from "@mui/material";
+import { Button, Typography, Stepper, Step, StepLabel, StepContent, CircularProgress, Alert } from "@mui/material";
 
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 import BLEServiceEnum, { AdvertisedServices, OptionalServices } from "@/lib/BLEServiceEnum";
@@ -180,6 +180,17 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
 
   return (
     <>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Please ensure that your browser supports Web Bluetooth and that Bluetooth is enabled on your device.
+        For the best experience, please enable the <i>#enable-web-bluetooth-confirm-pairing-support</i> in your browser.
+        <br />
+        <Button
+          variant="contained"
+          onClick={() => navigator.clipboard.writeText('chrome://flags/#enable-web-bluetooth-confirm-pairing-support')}
+          sx={{ marginTop: 2 }}
+        >Copy the link</Button>
+      </Alert>
+
       <Stepper activeStep={step} orientation="vertical">
         {connectingSteps.map((stepData, index) => (
           <Step key={index}>
