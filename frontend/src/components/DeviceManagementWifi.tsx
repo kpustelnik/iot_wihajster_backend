@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Typography, Skeleton, Alert, IconButton } from "@mui/material";
+import { Typography, Skeleton, Alert, IconButton, Button } from "@mui/material";
 import EditIcon from '@mui/icons-material/Edit';
 
 import BLEServiceEnum from "@/lib/BLEServiceEnum";
@@ -8,6 +8,7 @@ import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
 import WiFiChangeModal from "./WiFiChangeModal";
 import LTEEnableChangeModal from "./LTEEnableChangeModal";
 import SIMPinChangeModal from "./SIMPinChangeModal";
+import LTEGPSDebugModal from "./LTEGPSDebugModal";
 
 import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@/lib/WiFiAuthModeEnum";
 import DeviceModeEnum from "@/lib/DeviceModeEnum";
@@ -72,7 +73,7 @@ export default function DeviceManagementWifi({ server }: {
 
       const simPinCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.SIM_PIN));
       const simPinValue = await bluetoothQueueContext.enqueue(() => simPinCharacteristic.readValue());
-      setSimPin(simPinValue.getUint16(0));
+      setSimPin(simPinValue.getUint16(0, true));
 
       setAllLoaded(true);
     })();
@@ -81,6 +82,7 @@ export default function DeviceManagementWifi({ server }: {
   const [openWifiModal, setOpenWifiModal] = React.useState(false);
   const [openLTEEnableModal, setOpenLTEEnableModal] = React.useState(false);
   const [openSimPinModal, setOpenSimPinModal] = React.useState(false);
+  const [openLteGpsDebugModal, setOpenLteGpsDebugModal] = React.useState(false);
 
   return (
     <>
@@ -134,6 +136,13 @@ export default function DeviceManagementWifi({ server }: {
                       setCurrentSIMPin={setSimPin}
                     />
                   </Typography>
+
+                  <Button variant="contained" sx={{ mt: 2 }} onClick={() => { setOpenLteGpsDebugModal(true); }}>Open LTE/GPS Debug Console</Button>
+                  <LTEGPSDebugModal
+                    open={openLteGpsDebugModal}
+                    onClose={() => setOpenLteGpsDebugModal(false)}
+                    server={server}
+                  />
                 </>
               )
             }
