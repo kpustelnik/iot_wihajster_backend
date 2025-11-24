@@ -62,7 +62,7 @@ async def _mqtt_loop():
             async for message in messages:
                 payload = message.payload.decode(errors="ignore")
                 await process_message(message.topic, payload)
-                [_, user_id] = message.topic.split("/")
+                [_, _, user_id] = message.topic.split("/")
                 client.publish("Some data update!", f"data_update/{user_id}")
 
 
