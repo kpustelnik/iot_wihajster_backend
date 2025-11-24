@@ -32,7 +32,7 @@ logging.basicConfig(
 
 MQTT_HOST = "mqtt_ext"
 MQTT_PORT = 2883
-MQTT_TOPIC = "/sensors/#"
+MQTT_TOPIC = "sensors/#"
 
 
 async def process_message(topic: str, payload: str):
@@ -62,8 +62,8 @@ async def _mqtt_loop():
             async for message in messages:
                 payload = message.payload.decode(errors="ignore")
                 await process_message(message.topic, payload)
-                [_, _, user_id] = message.topic.split("/")
-                client.publish("Some data update!", f"/data_update/{user_id}")
+                [_, user_id] = message.topic.split("/")
+                client.publish("Some data update!", f"data_update/{user_id}")
 
 
 async def mqtt_runner():
