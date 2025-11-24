@@ -64,7 +64,7 @@ async def _mqtt_loop():
                 await process_message(topic_str, payload)
                 [_, user_id] = topic_str.split("/")
                 logger.info(f"Sending to data_update/{user_id}")
-                await client.publish("Some data update!", f"data_update/{user_id}")
+                await client.publish(f"data_update/{user_id}", payload="Blabla")
 
 
 async def mqtt_runner():
