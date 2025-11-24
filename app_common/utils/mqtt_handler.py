@@ -32,7 +32,7 @@ logging.basicConfig(
 
 MQTT_HOST = "mqtt_ext"
 MQTT_PORT = 2883
-MQTT_TOPIC = "sensors/#"
+MQTT_TOPIC = "/sensors/#"
 
 
 async def process_message(topic: str, payload: str):
