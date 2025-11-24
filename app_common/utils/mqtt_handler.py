@@ -55,7 +55,7 @@ async def _mqtt_loop():
     async with Client(MQTT_HOST, MQTT_PORT, tls_context=TLS_CONTEXT) as client:
         await client.subscribe(MQTT_TOPIC)
 
-        async with client.unfiltered_messages() as messages:
+        async with client.messages() as messages:
             async for message in messages:
                 payload = message.payload.decode(errors="ignore")
                 await process_message(message.topic, payload)
