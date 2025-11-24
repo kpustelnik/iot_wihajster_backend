@@ -10,8 +10,8 @@ def create_tls_context():
     context.load_verify_locations("/certs/ca_cert.crt")  # Root CA
     # TODO: Replace with AWS cert in case of AWS
     context.load_cert_chain(
-        certfile="/certs/mqtt_server.crt",  # cert klienta
-        keyfile="/certs/mqtt_server.key"            # klucz prywatny
+        certfile="/certs/mqtt_server.crt",
+        keyfile="/certs/mqtt_server.key"
     )
 
     context.check_hostname = False  # AWS IoT Core ma unikalny endpoint, ale i tak jest OK
@@ -26,7 +26,7 @@ TLS_CONTEXT = create_tls_context()
 
 logger = logging.getLogger(__name__)
 
-MQTT_HOST = "localhost"
+MQTT_HOST = "mqtt_ext"
 MQTT_PORT = 2883
 MQTT_TOPIC = "sensors/#"
 
@@ -39,6 +39,8 @@ async def process_message(topic: str, payload: str):
     - push do kolejki, itd.
     """
     logger.info(f"[MQTT] topic={topic}, payload={payload}")
+    [_, user_id] = topic.split("/")
+    client.publish("Some data update!", f"data_update/{user_id}")
     # TODO: np. zapis do DB
 
     
