@@ -21,6 +21,7 @@ services:
       retries: 15
 
   frontend_api:
+    user: "${UID}:${GID}"
     container_name: frontend_api
     hostname: frontend_api
     build:

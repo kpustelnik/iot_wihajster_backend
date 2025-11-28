@@ -29,3 +29,7 @@ Measurements:
 - longitude
 - latitude
 - time
+
+
+### help command to build:
+- UID=$(id -u) GID=$(id -g) docker compose up
