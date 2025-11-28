@@ -12,25 +12,21 @@
 """
 
 
+from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from app_common.database import get_db
 from app_common.models.user import User, UserType
 from app_common.schemas.default import (
-    Delete,
     Forbidden,
     LimitedResponse,
-    NotFound,
     Unauthorized,
 )
-from app_common.schemas.device import DeviceModel
-from app_common.schemas.family import FamilyCreate, FamilyDeviceModel, FamilyModel, FamilyMemberModel
-from app_common.schemas.measurement import CriteriaModel, MeasurementModel
-from app_common.schemas.user import UserModel
+from app_common.schemas.measurement import  MeasurementModel
 from frontend_api.docs import Tags
-from frontend_api.repos import family_repo, measurement_repo
+from frontend_api.repos import measurement_repo
 from frontend_api.utils.auth.auth import RequireUser
 
 router = APIRouter(
@@ -54,7 +50,13 @@ router = APIRouter(
     response_description="Successful Response",
 )
 async def get_measurements(
-        critiria: CriteriaModel,
+        device_id: Optional[int] = Query(default=None, ge=0),
+        family_id: Optional[int] = Query(default=None, ge=0),
+        time_from: Optional[datetime] = Query(default=None),
+        time_to: Optional[datetime] = Query(default=None),
+        lat: Optional[float] = Query(default=None),
+        lon: Optional[float] = Query(default=None),
+        radius_km: Optional[float] = Query(default=None),
         offset: int = Query(default=0, ge=0),
         limit: int = Query(default=100, ge=0, le=500),
         user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
@@ -63,7 +65,5 @@ async def get_measurements(
     """
     Get measurements.
     """
-    return await measurement_repo.get_measurements(db, critiria, user, offset, limit)
-
-
+    return await measurement_repo.get_measurements(db, device_id, family_id, time_from, time_to, lat, lon, radius_km, user, offset, limit)
 
