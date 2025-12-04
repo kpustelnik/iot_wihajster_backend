@@ -26,6 +26,8 @@ export default {
             description: "Device operating mode",
         }),
 
+        // TODO: Add BMP280 Settings changing
+
         m.numeric({
             name: "boot_count",
             scale: 1,
