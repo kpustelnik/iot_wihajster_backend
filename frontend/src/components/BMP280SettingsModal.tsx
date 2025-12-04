@@ -60,7 +60,7 @@ export default function BMP280SettingsModal({ open, onClose, server }: {
             <FormControl>
               <FormLabel id="bmp280-pressure-oversampling">Pressure oversampling</FormLabel>
               <RadioGroup
-                value={newBMP280Settings}
+                value={newBMP280Settings.toString()}
                 onChange={(e) => setNewBMP280Settings({ ...newBMP280Settings, oversamplingPress: parseInt(e.target.value) })}
                 name="bmp280-pressure-oversampling"
               >
@@ -76,7 +76,7 @@ export default function BMP280SettingsModal({ open, onClose, server }: {
             <FormControl>
               <FormLabel id="bmp280-temperature-oversampling">Temperature oversampling</FormLabel>
               <RadioGroup
-                value={newBMP280Settings}
+                value={newBMP280Settings.toString()}
                 onChange={(e) => setNewBMP280Settings({ ...newBMP280Settings, oversamplingTemp: parseInt(e.target.value) })}
                 name="bmp280-temperature-oversampling"
               >
@@ -92,7 +92,7 @@ export default function BMP280SettingsModal({ open, onClose, server }: {
             <FormControl>
               <FormLabel id="bmp280-standby">Standby time</FormLabel>
               <RadioGroup
-                value={newBMP280Settings}
+                value={newBMP280Settings.toString()}
                 onChange={(e) => setNewBMP280Settings({ ...newBMP280Settings, standbyTime: parseInt(e.target.value) })}
                 name="bmp280-standby"
               >
@@ -110,7 +110,7 @@ export default function BMP280SettingsModal({ open, onClose, server }: {
             <FormControl>
               <FormLabel id="bmp280-filter">Filter</FormLabel>
               <RadioGroup
-                value={newBMP280Settings}
+                value={newBMP280Settings.toString()}
                 onChange={(e) => setNewBMP280Settings({ ...newBMP280Settings, filter: parseInt(e.target.value) })}
                 name="bmp280-filter"
               >
