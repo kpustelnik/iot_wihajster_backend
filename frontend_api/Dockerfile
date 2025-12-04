@@ -49,6 +49,6 @@ COPY ./tests/database /code/tests/database
 
 EXPOSE 80
 
-HEALTHCHECK --interval=5m --timeout=2m --start-period=1m \
-   CMD curl -f --retry 6 --max-time 5 --retry-delay 10 --retry-max-time 60 "http://127.0.0.1:80/healthcheck" || bash -c 'kill -s 15 1 && (sleep 30; kill -s 9 1)'
+#HEALTHCHECK --interval=5m --timeout=2m --start-period=1m \
+#   CMD curl -f --retry 6 --max-time 5 --retry-delay 10 --retry-max-time 60 "http://127.0.0.1:80/healthcheck" || bash -c 'kill -s 15 1 && (sleep 30; kill -s 9 1)'
 CMD ["uvicorn", "frontend_api.main:app", "--host", "0.0.0.0","--port", "80", "--log-config", "/code/config/log.yaml"]
