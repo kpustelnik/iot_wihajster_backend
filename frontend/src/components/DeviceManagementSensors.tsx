@@ -1,9 +1,11 @@
 import * as React from "react";
-import { Typography, Skeleton } from "@mui/material";
+import { Typography, Skeleton, Button } from "@mui/material";
 
 import BLEServiceEnum from "@/lib/BLEServiceEnum";
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
+
+import BMP280SettingsModal from "./BMP280SettingsModal";
 
 export default function DeviceManagementSensors({ server }: {
   server: BluetoothRemoteGATTServer,
@@ -114,6 +116,7 @@ export default function DeviceManagementSensors({ server }: {
     })();
   }, [server, bluetoothQueueContext]);
 
+  const [openBMP280SettingsModal, setOpenBMP280SettingsModal] = React.useState(false);
   return (
     <>
       {
@@ -130,6 +133,7 @@ export default function DeviceManagementSensors({ server }: {
           </>
         ) : (
           <>
+            {/* Display section */}
             { (temperature !== null) ? (
               <Typography>Temperature: {temperature.toFixed(2)} °C</Typography>
             ) : null }
@@ -157,6 +161,16 @@ export default function DeviceManagementSensors({ server }: {
             { (batteryPercent !== null) ? (
               <Typography>Battery Percent: {batteryPercent.toFixed(2)} %</Typography>
             ) : null }
+
+            {/* Settings section */}
+            <Button variant="contained" sx={{ mt: 2 }} onClick={() => setOpenBMP280SettingsModal(true)}>
+              Adjust BMP280 Temperature & Pressure sensor settings
+            </Button>
+            <BMP280SettingsModal
+              open={openBMP280SettingsModal}
+              onClose={() => setOpenBMP280SettingsModal(false)}
+              server={server}
+            />
           </>
         )
       }

@@ -32,7 +32,9 @@ enum BLECharacteristicEnum {
   PMS5003_PM_2_5 = 0x1961,
   PMS5003_PM_10_0 = 0x1962,
   BATTERY_VOLTAGE = 0x1963,
-  BATTERY_PERCENT = 0x1964
+  BATTERY_PERCENT = 0x1964,
+
+  BMP280_SETTINGS = 0x1970
 }
 
 export default BLECharacteristicEnum;
