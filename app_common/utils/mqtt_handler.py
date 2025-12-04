@@ -55,15 +55,19 @@ async def _mqtt_loop():
     """
     async with Client(MQTT_HOST, MQTT_PORT, tls_context=TLS_CONTEXT) as client:
         await client.subscribe(MQTT_TOPIC)
+        logger.info(f"[MQTT] Subscribed to {MQTT_TOPIC}")
 
-        async with client.messages() as messages:
-            async for message in messages:
+        async for message in client.messages:
+            try:
                 payload = message.payload.decode(errors="ignore")
                 topic_str = str(message.topic)
                 await process_message(topic_str, payload)
                 [_, user_id] = topic_str.split("/")
                 logger.info(f"Sending to data_update/{user_id}")
                 await client.publish(f"data_update/{user_id}", payload="Blabla")
+            except Exception as e:
+                logger.error(f"[MQTT] Error processing message: {e!r}")
+                continue
 
 
 async def mqtt_runner():
