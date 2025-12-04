@@ -22,9 +22,6 @@ async def lifespan(_app: FastAPI):
         await session.close()
         logger.critical("DEBUG MODE IS ON")
         logger.critical("Make sure to not use it on production.")
-    yield
-    if sessionmanager.engine is not None:
-        await sessionmanager.close()
 
     try:
         yield
@@ -35,3 +32,5 @@ async def lifespan(_app: FastAPI):
                 await _mqtt_task
             except asyncio.CancelledError:
                 pass
+        if sessionmanager.engine is not None:
+            await sessionmanager.close()
