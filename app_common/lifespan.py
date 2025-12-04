@@ -26,11 +26,11 @@ async def lifespan(_app: FastAPI):
     try:
         yield
     finally:
+        if sessionmanager.engine is not None:
+            await sessionmanager.close()
         if _mqtt_task and not _mqtt_task.done():
             _mqtt_task.cancel()
             try:
-                await _mqtt_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(_mqtt_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
-        if sessionmanager.engine is not None:
-            await sessionmanager.close()
