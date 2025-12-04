@@ -57,17 +57,21 @@ async def _mqtt_loop():
         await client.subscribe(MQTT_TOPIC)
         logger.info(f"[MQTT] Subscribed to {MQTT_TOPIC}")
 
-        async for message in client.messages:
-            try:
-                payload = message.payload.decode(errors="ignore")
-                topic_str = str(message.topic)
-                await process_message(topic_str, payload)
-                [_, user_id] = topic_str.split("/")
-                logger.info(f"Sending to data_update/{user_id}")
-                await client.publish(f"data_update/{user_id}", payload="Blabla")
-            except Exception as e:
-                logger.error(f"[MQTT] Error processing message: {e!r}")
-                continue
+        try:
+            async for message in client.messages:
+                try:
+                    payload = message.payload.decode(errors="ignore")
+                    topic_str = str(message.topic)
+                    await process_message(topic_str, payload)
+                    [_, user_id] = topic_str.split("/")
+                    logger.info(f"Sending to data_update/{user_id}")
+                    await client.publish(f"data_update/{user_id}", payload="Blabla")
+                except Exception as e:
+                    logger.error(f"[MQTT] Error processing message: {e!r}")
+                    continue
+        except asyncio.CancelledError:
+            logger.info("[MQTT] Message loop cancelled.")
+            raise
 
 
 async def mqtt_runner():
@@ -78,13 +82,17 @@ async def mqtt_runner():
     Ta funkcja powinna działać w tle od startu FastAPI.
     """
     reconnect_delay = 3
-    while True:
-        try:
-            logger.info("[MQTT] Connecting to broker...")
-            await _mqtt_loop()
-        except MqttError as e:
-            logger.error(f"[MQTT] Connection lost: {e!r}. Reconnecting in {reconnect_delay}s...")
-            await asyncio.sleep(reconnect_delay)
-        except Exception as e:
-            logger.exception(f"[MQTT] Unexpected error: {e!r}. Reconnecting in {reconnect_delay}s...")
-            await asyncio.sleep(reconnect_delay)
+    try:
+        while True:
+            try:
+                logger.info("[MQTT] Connecting to broker...")
+                await _mqtt_loop()
+            except MqttError as e:
+                logger.error(f"[MQTT] Connection lost: {e!r}. Reconnecting in {reconnect_delay}s...")
+                await asyncio.sleep(reconnect_delay)
+            except Exception as e:
+                logger.exception(f"[MQTT] Unexpected error: {e!r}. Reconnecting in {reconnect_delay}s...")
+                await asyncio.sleep(reconnect_delay)
+    except asyncio.CancelledError:
+        logger.info("[MQTT] MQTT task cancelled, shutting down gracefully.")
+        raise
