@@ -42,6 +42,18 @@ export default {
             unit: 'hPa'
         }),
 
+        m.numeric({
+            name: "BMP280 temperature",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0013, type: Zcl.DataType.SINGLE_PREC },
+            reporting: {min: "10_SECONDS", max: "1_HOUR", change: 100},
+            description: "Measured BMP280 temperature value",
+            unit: "°C",
+            scale: 100,
+            access: "STATE_GET",
+            ...args,
+        }),
+
         m.battery({
             percentage: true,
             voltage: true,
