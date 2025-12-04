@@ -1,9 +1,11 @@
 import * as React from "react";
-import { Typography, Skeleton } from "@mui/material";
+import { Typography, Skeleton, Button } from "@mui/material";
 
 import BLEServiceEnum from "@/lib/BLEServiceEnum";
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
+
+import BMP280SettingsModal from "./BMP280SettingsModal";
 
 export default function DeviceManagementSensors({ server }: {
   server: BluetoothRemoteGATTServer,
@@ -12,6 +14,7 @@ export default function DeviceManagementSensors({ server }: {
   const [temperature, setTemperature] = React.useState<number | null>(null);
   const [humidity, setHumidity] = React.useState<number | null>(null);
   const [pressure, setPressure] = React.useState<number | null>(null);
+  const [bmp280Temperature, setbmp280Temperature] = React.useState<number | null>(null);
   
   const [pm1_0, setPm1_0] = React.useState<number | null>(null);
   const [pm2_5, setPm2_5] = React.useState<number | null>(null);
@@ -53,6 +56,15 @@ export default function DeviceManagementSensors({ server }: {
       });
       await bluetoothQueueContext.enqueue(() => bmp280PressureCharacteristic.startNotifications());
       await bluetoothQueueContext.enqueue(() => bmp280PressureCharacteristic.readValue());
+
+      const bmp280TemperatureCharacteristic = await bluetoothQueueContext.enqueue(() => sensorsService.getCharacteristic(BLECharacteristicEnum.BMP280_TEMPERATURE));
+      bmp280TemperatureCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+        const target = event.target as BluetoothRemoteGATTCharacteristic;
+        const value = target.value;
+        if (value) setbmp280Temperature(value.getFloat32(0, true));
+      });
+      await bluetoothQueueContext.enqueue(() => bmp280TemperatureCharacteristic.startNotifications());
+      await bluetoothQueueContext.enqueue(() => bmp280TemperatureCharacteristic.readValue());
 
       const pms5003PM1_0Characteristic = await bluetoothQueueContext.enqueue(() => sensorsService.getCharacteristic(BLECharacteristicEnum.PMS5003_PM_1_0));
       pms5003PM1_0Characteristic.addEventListener('characteristicvaluechanged', (event) => {
@@ -104,6 +116,7 @@ export default function DeviceManagementSensors({ server }: {
     })();
   }, [server, bluetoothQueueContext]);
 
+  const [openBMP280SettingsModal, setOpenBMP280SettingsModal] = React.useState(false);
   return (
     <>
       {
@@ -120,6 +133,7 @@ export default function DeviceManagementSensors({ server }: {
           </>
         ) : (
           <>
+            {/* Display section */}
             { (temperature !== null) ? (
               <Typography>Temperature: {temperature.toFixed(2)} °C</Typography>
             ) : null }
@@ -128,6 +142,9 @@ export default function DeviceManagementSensors({ server }: {
             ) : null }
             { (pressure !== null) ? (
               <Typography>Pressure: {pressure.toFixed(2)} Pa</Typography>
+            ) : null }
+            { (bmp280Temperature !== null) ? (
+              <Typography>BMP280 Temperature: {bmp280Temperature.toFixed(2)} °C</Typography>
             ) : null }
             { (pm1_0 !== null) ? (
               <Typography>PM 1.0: {pm1_0} µg/m³</Typography>
@@ -144,6 +161,16 @@ export default function DeviceManagementSensors({ server }: {
             { (batteryPercent !== null) ? (
               <Typography>Battery Percent: {batteryPercent.toFixed(2)} %</Typography>
             ) : null }
+
+            {/* Settings section */}
+            <Button variant="contained" sx={{ mt: 2 }} onClick={() => setOpenBMP280SettingsModal(true)}>
+              Adjust BMP280 Temperature & Pressure sensor settings
+            </Button>
+            <BMP280SettingsModal
+              open={openBMP280SettingsModal}
+              onClose={() => setOpenBMP280SettingsModal(false)}
+              server={server}
+            />
           </>
         )
       }

@@ -14,7 +14,7 @@ logger = logging.getLogger('uvicorn.error')
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await sessionmanager.init_db()
-    asyncio.create_task(mqtt_runner())
+    _mqtt_task = asyncio.create_task(mqtt_runner())
     if settings.debug:
         from tests.database.csv_to_db import entries
         session = sessionmanager.session()
@@ -22,6 +22,15 @@ async def lifespan(_app: FastAPI):
         await session.close()
         logger.critical("DEBUG MODE IS ON")
         logger.critical("Make sure to not use it on production.")
-    yield
-    if sessionmanager.engine is not None:
-        await sessionmanager.close()
+
+    try:
+        yield
+    finally:
+        if sessionmanager.engine is not None:
+            await sessionmanager.close()
+        if _mqtt_task and not _mqtt_task.done():
+            _mqtt_task.cancel()
+            try:
+                await asyncio.wait_for(_mqtt_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
