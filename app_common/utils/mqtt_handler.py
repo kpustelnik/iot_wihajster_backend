@@ -1,8 +1,7 @@
 import ssl
 import asyncio
 import logging
-from asyncio_mqtt import Client, MqttError
-
+from aiomqtt import Client, MqttError
 
 def create_tls_context():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
