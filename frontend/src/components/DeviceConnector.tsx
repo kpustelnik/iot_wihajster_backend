@@ -18,7 +18,7 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
   const [step, setStep] = useState<number>(0);
   const [pin, setPin] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  
+
   // TODO: Add alert (error handling)
   const connectBluetooth = async () => {
     if ('bluetooth' in navigator) {
@@ -76,7 +76,7 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
         cert: certificateString
       }).then(async response => {
         const stringifiedData = JSON.stringify(response.data);
-          
+
         setStep(3);
         const deviceProxiedCommunicationCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_PROXIED_COMMUNICATION));
         for (let i = 0; i < stringifiedData.length; i += 200) {
