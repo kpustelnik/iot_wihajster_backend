@@ -14,7 +14,7 @@ logger = logging.getLogger('uvicorn.error')
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await sessionmanager.init_db()
-    asyncio.create_task(mqtt_runner())
+    asyncio.run(mqtt_runner())
     if settings.debug:
         from tests.database.csv_to_db import entries
         session = sessionmanager.session()
