@@ -1,6 +1,6 @@
 from sqlite3 import IntegrityError
 from fastapi import HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -22,7 +22,7 @@ async def get_user_by_login(db: AsyncSession, login: str) -> User | None:
 
 
 async def get_users(
-    db: AsyncSession,
+        db: AsyncSession,
         user: User,
         offset: int,
         limit: int
@@ -33,6 +33,36 @@ async def get_users(
     if user.type == UserType.CLIENT:
         count_query = count_query.where(User.type == UserType.CLIENT)
         query = query.where(User.type == UserType.CLIENT)
+
+    count = await db.scalar(count_query)
+    users = (await db.scalars(query)).all()
+    return LimitedResponse(
+        total_count=count, offset=offset, limit=limit, content=[*users]
+    )
+
+
+async def search_users(
+        db: AsyncSession,
+        user: User,
+        search_query: str | None,
+        offset: int,
+        limit: int
+) -> LimitedResponse[UserModel]:
+    count_query = select(func.count()).select_from(User)
+    query = select(User).offset(offset).limit(limit)
+
+    if user.type == UserType.CLIENT:
+        count_query = count_query.where(User.type == UserType.CLIENT)
+        query = query.where(User.type == UserType.CLIENT)
+
+    count_query = count_query.where(or_(
+        User.login.ilike(f"%{search_query}%"),
+        User.email.ilike(f"%{search_query}%")
+    ))
+    query = query.where(or_(
+        User.login.ilike(f"%{search_query}%"),
+        User.email.ilike(f"%{search_query}%")
+    ))
 
     count = await db.scalar(count_query)
     users = (await db.scalars(query)).all()

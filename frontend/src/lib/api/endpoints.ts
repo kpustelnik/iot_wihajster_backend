@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
         provision: '/devices/provision',
         connect: '/devices/connect',
         confirm: '/devices/confirm',
+        list: '/devices',
     },
     users: {
         login: '/users/login',
@@ -17,6 +18,7 @@ export const API_ENDPOINTS = {
         recover: '/users/recover',
         current: '/users/current',
         list: '/users',
+        search: '/users/search',
         byId: (userId: number) => `/users/${userId}`,
     },
     families: {

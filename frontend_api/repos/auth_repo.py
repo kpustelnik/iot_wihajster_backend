@@ -37,4 +37,7 @@ async def recover(
         login: str
 ) -> PasswordRecoverModel:
     query = select(User).where(User.login == login)
-    return PasswordRecoverModel(password=(await db.scalar(query)).password)
+    user = await db.scalar(query)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return PasswordRecoverModel(password=user.password)

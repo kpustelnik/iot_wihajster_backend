@@ -1,8 +1,16 @@
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+
+class Timescale(StrEnum):
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    YEAR = "year"
 
 
 class MeasurementModel(BaseModel):

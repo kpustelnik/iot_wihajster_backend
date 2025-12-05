@@ -20,12 +20,34 @@ from frontend_api.utils.auth.auth import RequireUser
 
 router = APIRouter(
     prefix="/families",
-    tags=[Tags.Users],
+    tags=[Tags.Family],
     responses={
         status.HTTP_401_UNAUTHORIZED: {"model": Unauthorized},
         status.HTTP_403_FORBIDDEN: {"model": Forbidden},
     },
 )
+
+
+@router.get(
+    "",
+    dependencies=[],
+    tags=[],
+    response_model=LimitedResponse[FamilyModel],
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="Get family",
+    response_description="Successful Response",
+)
+async def get_family(
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=0, le=500),
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db),
+):
+    """
+    Get my families
+    """
+    return await family_repo.get_family(db, current_user, offset, limit)
 
 
 @router.post(

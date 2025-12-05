@@ -30,12 +30,19 @@ export enum FamilyStatus {
     ACCEPTED = 'ACCEPTED',
 }
 
+export enum Timescale {
+    DAY = 'day',
+    WEEK = 'week',
+    MONTH = 'month',
+    YEAR = 'year',
+}
+
 // ============================================================================
 // Common Schemas
 // ============================================================================
 
 export interface LimitedResponse<T> {
-    items: T[];
+    content: T[];
     total: number;
     offset: number;
     limit: number;
@@ -198,4 +205,5 @@ export interface MeasurementQueryParams {
     radius_km?: number;
     offset?: number;
     limit?: number;
+    timescale?: Timescale;
 }

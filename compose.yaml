@@ -19,9 +19,11 @@ services:
       timeout: 60s
       start_period: 30s
       retries: 15
+    ports:
+      - 5432:5432
 
   frontend_api:
-    user: "${UID}:${GID}"
+    # user: "${UID}:${GID}" TODO temporary disabled
     container_name: frontend_api
     hostname: frontend_api
     restart: unless-stopped
@@ -39,8 +41,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      mqtt_ext:
-        condition: service_started
+      # mqtt_ext: TODO temporary disabled
+      #   condition: service_started
     links:
       - db
     ports:

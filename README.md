@@ -1,3 +1,11 @@
+
+### help command to build:
+- UID=$(id -u) GID=$(id -g) docker compose up
+
+### environment variables:
+- DEBUG=true - debug mode changes backend to localhost:3999
+
+
 Users:
 - id
 - login
@@ -29,7 +37,3 @@ Measurements:
 - longitude
 - latitude
 - time
-
-
-### help command to build:
-- UID=$(id -u) GID=$(id -g) docker compose up

@@ -64,6 +64,17 @@ export const usersApi = {
     },
 
     /**
+     * Search users
+     */
+    searchUsers: async (searchQuery: string, offset: number = 0, limit: number = 100) => {
+        const response = await axios.get<LimitedResponse<UserModel>>(
+            API_ENDPOINTS.users.search,
+            { params: { search_query: searchQuery, offset, limit } }
+        );
+        return response.data;
+    },
+
+    /**
      * Create new user
      */
     createUser: async (user: UserCreate) => {

@@ -1,7 +1,7 @@
 from sqlite3 import IntegrityError
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -11,6 +11,36 @@ from app_common.models.user import User
 from app_common.schemas.default import Delete, LimitedResponse
 from app_common.schemas.device import DeviceModel
 from app_common.schemas.family import FamilyCreate
+
+
+async def get_family(
+        db: AsyncSession,
+        current_user: User,
+        offset: int,
+        limit: int
+):
+    count_query = (select(func.count(distinct(Family.id)))
+        .join(FamilyMember, FamilyMember.family_id == Family.id)
+        .where(or_(
+            Family.user_id == current_user.id,
+            FamilyMember.user_id == current_user.id
+    )))
+    query = (select(Family).distinct(Family.id)
+    .join(FamilyMember, FamilyMember.family_id == Family.id)
+    .where(or_(
+        Family.user_id == current_user.id,
+        FamilyMember.user_id == current_user.id
+    ))
+        .offset(offset).limit(limit)
+    )
+    count = await db.scalar(count_query)
+    families = (await db.scalars(query)).all()
+    return LimitedResponse(
+        offset=offset,
+        limit=limit,
+        total_count=count,
+        content=[*families]
+    )
 
 
 async def create_family(

@@ -11,6 +11,11 @@ export default function Home() {
           Connect device
         </Button>
       </Link>
+      <Link href="/login" style={{ marginLeft: '1rem' }}>
+        <Button variant="contained" color="secondary">
+          Login
+        </Button>
+      </Link>
     </>
   );
 }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 import uuid
@@ -6,9 +6,12 @@ import random
 import json
 
 from app_common.database import get_db
+from app_common.models.user import UserType, User
+from app_common.schemas.default import LimitedResponse
 from frontend_api.docs import Tags
 from frontend_api.repos import device_repo
-from app_common.schemas.device import DeviceConnectInit, DeviceConnectConfirm, DeviceProvision, DeviceCreate
+from app_common.schemas.device import DeviceConnectInit, DeviceConnectConfirm, DeviceProvision, DeviceCreate, \
+    DeviceModel
 
 from app_common.utils.certs.ca import CertificateAuthority
 
@@ -18,6 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
 
+from frontend_api.utils.auth.auth import RequireUser
 
 router = APIRouter(
     prefix="/devices",
@@ -33,6 +37,7 @@ router = APIRouter(
     * protected: mangle the gps data
     * public: everybody has access to every data point
 """
+
 
 
 @router.post(
@@ -57,6 +62,27 @@ async def provision_device(
         'device_cert': device_cert.cert_chain_pems[0].bytes().decode("utf-8"),
         'device_key': device_cert.private_key_pem.bytes().decode("utf-8")
     }
+
+
+
+
+@router.get(
+    "",
+    dependencies=[],
+    tags=[],
+    response_model=LimitedResponse[DeviceModel],
+    status_code=status.HTTP_200_OK,
+    summary="Get my devices",
+    response_description="Successful Response",
+)
+async def get_devices(
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=0, le=500),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN]))
+):
+    return await device_repo.get_devices(db, current_user, offset, limit)
+
 
 challenges = {}
 @router.post(

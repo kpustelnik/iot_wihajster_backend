@@ -125,6 +125,29 @@ async def get_users(
     return await user_repo.get_users(db, user, offset, limit)
 
 
+@router.get(
+    "/search",
+    dependencies=[],
+    tags=None,
+    response_model=LimitedResponse[UserModel],
+    responses=None,
+    status_code=status.HTTP_200_OK,
+    summary="search users",
+    response_description="Successful Response",
+)
+async def search_users(
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=0, le=500),
+        search_query: str = Query(default=None),
+        user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+        db=Depends(get_db),
+):
+    """
+    Search users.
+    """
+    return await user_repo.search_users(db, user, search_query, offset, limit)
+
+
 @router.delete(
     "/{user_id}",
     dependencies=[Depends(RequireUser(UserType.ADMIN))],

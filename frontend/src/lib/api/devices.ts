@@ -12,6 +12,8 @@ import type {
     DeviceConnectInitResponse,
     DeviceConnectConfirm,
     DeviceConnectConfirmResponse,
+    LimitedResponse,
+    DeviceModel,
 } from './schemas';
 
 export const devicesApi = {
@@ -46,6 +48,14 @@ export const devicesApi = {
             API_ENDPOINTS.devices.confirm,
             data
         );
+        return response.data;
+    },
+
+    /**
+     * List all devices
+     */
+    list: async () => {
+        const response = await axios.get<LimitedResponse<DeviceModel>>(API_ENDPOINTS.devices.list);
         return response.data;
     },
 };

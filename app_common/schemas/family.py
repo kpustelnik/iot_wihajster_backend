@@ -26,3 +26,4 @@ class FamilyDeviceModel(BaseModel):
 @omit("id", "user_id")
 class FamilyCreate(FamilyModel):
     pass
+

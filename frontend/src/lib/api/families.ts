@@ -19,6 +19,17 @@ import type {
 
 export const familiesApi = {
     /**
+     * Get families list
+     */
+    getFamilies: async (offset: number = 0, limit: number = 100) => {
+        const response = await axios.get<LimitedResponse<FamilyModel>>(
+            API_ENDPOINTS.families.list,
+            { params: { offset, limit } }
+        );
+        return response.data;
+    },
+
+    /**
      * Create new family
      */
     createFamily: async (family: FamilyCreate) => {
