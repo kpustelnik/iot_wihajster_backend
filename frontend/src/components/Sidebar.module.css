@@ -1,0 +1,123 @@
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 380px;
+    height: 100vh;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(20px);
+    box-shadow: 4px 0 30px var(--shadow-color);
+    z-index: 900;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+    overflow-y: auto;
+}
+
+.sidebar.visible {
+    transform: translateX(0);
+}
+
+.sidebar.hidden {
+    transform: translateX(-100%);
+}
+
+.content {
+    padding: 24px;
+    padding-top: 80px;
+}
+
+.contentSection h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.contentSection p {
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+}
+
+.placeholder {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-top: 20px;
+}
+
+.toggleButton {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 901;
+    width: 40px;
+    height: 80px;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: none;
+    border-radius: 0 12px 12px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 4px 0 20px var(--shadow-color);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggleButton:hover {
+    background: var(--card-hover);
+    transform: translateY(-50%) translateX(4px);
+    box-shadow: 6px 0 30px var(--shadow-hover);
+}
+
+.toggleButton.visible {
+    opacity: 1;
+}
+
+.toggleButton.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.arrow {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--accent-primary);
+    transition: transform 0.3s ease;
+}
+
+.toggleButton:hover .arrow {
+    transform: translateX(2px);
+}
+
+/* Scrollbar styling */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.3);
+    border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.5);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        max-width: 380px;
+    }
+}
