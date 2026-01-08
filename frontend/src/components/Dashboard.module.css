@@ -1,0 +1,344 @@
+.dashboard {
+    padding: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+.deviceInfo {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.statusBadge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.statusOnline {
+    background-color: #10b981;
+    color: white;
+}
+
+.statusOffline {
+    background-color: #ef4444;
+    color: white;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.card {
+    background: var(--card-background, #ffffff);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.cardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.cardHeader h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.cardIcon {
+    font-size: 1.5rem;
+}
+
+.sensorGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.sensorItem {
+    text-align: center;
+    padding: 0.75rem;
+    background: var(--sensor-bg, #f9fafb);
+    border-radius: 8px;
+}
+
+.sensorValue {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-color, #3b82f6);
+}
+
+.sensorLabel {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    margin-top: 0.25rem;
+}
+
+.sensorUnit {
+    font-size: 0.875rem;
+    color: var(--text-secondary, #6b7280);
+}
+
+.controlsGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.controlRow {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.controlLabel {
+    flex: 0 0 100px;
+    font-weight: 500;
+}
+
+.controlInput {
+    flex: 1;
+}
+
+.colorPicker {
+    width: 100%;
+    height: 40px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.slider {
+    width: 100%;
+    accent-color: var(--primary-color, #3b82f6);
+}
+
+.button {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.buttonPrimary {
+    background: var(--primary-color, #3b82f6);
+    color: white;
+}
+
+.buttonPrimary:hover {
+    background: var(--primary-hover, #2563eb);
+}
+
+.buttonSecondary {
+    background: var(--secondary-bg, #e5e7eb);
+    color: var(--text-primary, #374151);
+}
+
+.buttonSecondary:hover {
+    background: var(--secondary-hover, #d1d5db);
+}
+
+.buttonDanger {
+    background: #ef4444;
+    color: white;
+}
+
+.buttonDanger:hover {
+    background: #dc2626;
+}
+
+.buttonGroup {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.modeButton {
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.modeButton:hover {
+    background: var(--hover-bg, #f3f4f6);
+}
+
+.modeButtonActive {
+    background: var(--primary-color, #3b82f6);
+    color: white;
+    border-color: var(--primary-color, #3b82f6);
+}
+
+.batteryContainer {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.batteryBar {
+    flex: 1;
+    height: 24px;
+    background: var(--sensor-bg, #f9fafb);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.batteryFill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #22c55e);
+    transition: width 0.3s;
+}
+
+.batteryFillLow {
+    background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+.batteryPercent {
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.alertWarning {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+}
+
+.alertError {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #ef4444;
+}
+
+.alertSuccess {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+}
+
+.otaProgress {
+    margin-top: 1rem;
+}
+
+.progressBar {
+    width: 100%;
+    height: 8px;
+    background: var(--sensor-bg, #f9fafb);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progressFill {
+    height: 100%;
+    background: var(--primary-color, #3b82f6);
+    transition: width 0.3s;
+}
+
+.progressText {
+    text-align: center;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary, #6b7280);
+}
+
+.transferCode {
+    font-family: monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 1rem;
+    background: var(--sensor-bg, #f9fafb);
+    border-radius: 8px;
+    letter-spacing: 0.2em;
+}
+
+.refreshButton {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    padding: 0.25rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.refreshButton:hover {
+    opacity: 1;
+}
+
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 3rem;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color, #e5e7eb);
+    border-top-color: var(--primary-color, #3b82f6);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Dark mode */
+:global(.dark) .card {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+:global(.dark) .sensorItem {
+    background: #374151;
+}
+
+:global(.dark) .modeButton {
+    border-color: #4b5563;
+}
+
+:global(.dark) .modeButton:hover {
+    background: #374151;
+}
+
+:global(.dark) .batteryBar,
+:global(.dark) .progressBar {
+    background: #374151;
+}

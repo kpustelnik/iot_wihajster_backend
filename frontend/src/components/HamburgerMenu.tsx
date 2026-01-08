@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from 'react';
-import styles from './HamburgerMenu.module.css';
+import {
+    IconButton,
+    Menu,
+    MenuItem,
+    ListItemIcon,
+    ListItemText,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
+import DevicesIcon from '@mui/icons-material/Devices';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 export type MenuOption = 'families' | 'devices' | 'account';
 
@@ -11,15 +21,20 @@ interface HamburgerMenuProps {
 }
 
 export default function HamburgerMenu({ isVisible, onSelectOption }: HamburgerMenuProps) {
-    const [isOpen, setIsOpen] = useState(false);
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const open = Boolean(anchorEl);
 
-    const handleToggle = () => {
-        setIsOpen(!isOpen);
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
     };
 
     const handleOptionClick = (option: MenuOption) => {
         onSelectOption(option);
-        setIsOpen(false);
+        handleClose();
     };
 
     if (!isVisible) {
@@ -28,44 +43,44 @@ export default function HamburgerMenu({ isVisible, onSelectOption }: HamburgerMe
 
     return (
         <>
-            <button
-                className={`${styles.hamburger} ${isOpen ? styles.open : ''}`}
-                onClick={handleToggle}
+            <IconButton
+                onClick={handleClick}
                 aria-label="Menu"
+                aria-controls={open ? 'hamburger-menu' : undefined}
+                aria-haspopup="true"
+                aria-expanded={open ? 'true' : undefined}
             >
-                <span className={styles.bar}></span>
-                <span className={styles.bar}></span>
-                <span className={styles.bar}></span>
-            </button>
+                <MenuIcon />
+            </IconButton>
 
-            {isOpen && (
-                <>
-                    <div className={styles.overlay} onClick={handleToggle} />
-                    <div className={styles.menu}>
-                        <button
-                            className={styles.menuItem}
-                            onClick={() => handleOptionClick('families')}
-                        >
-                            <span className={styles.icon}>👨‍👩‍👧‍👦</span>
-                            <span>Families</span>
-                        </button>
-                        <button
-                            className={styles.menuItem}
-                            onClick={() => handleOptionClick('devices')}
-                        >
-                            <span className={styles.icon}>📱</span>
-                            <span>Devices</span>
-                        </button>
-                        <button
-                            className={styles.menuItem}
-                            onClick={() => handleOptionClick('account')}
-                        >
-                            <span className={styles.icon}>👤</span>
-                            <span>Account</span>
-                        </button>
-                    </div>
-                </>
-            )}
+            <Menu
+                id="hamburger-menu"
+                anchorEl={anchorEl}
+                open={open}
+                onClose={handleClose}
+                MenuListProps={{
+                    'aria-labelledby': 'hamburger-button',
+                }}
+            >
+                <MenuItem onClick={() => handleOptionClick('families')}>
+                    <ListItemIcon>
+                        <FamilyRestroomIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Rodziny</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => handleOptionClick('devices')}>
+                    <ListItemIcon>
+                        <DevicesIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Urządzenia</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => handleOptionClick('account')}>
+                    <ListItemIcon>
+                        <AccountCircleIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Konto</ListItemText>
+                </MenuItem>
+            </Menu>
         </>
     );
 }
