@@ -508,7 +508,7 @@ async def get_device_sensors_latest(
     result = await db.execute(
         select(Measurement)
         .where(Measurement.device_id == device_id)
-        .order_by(Measurement.created_at.desc())
+        .order_by(Measurement.time.desc())
         .limit(1)
     )
     measurement = result.scalar_one_or_none()
@@ -517,15 +517,14 @@ async def get_device_sensors_latest(
         return {}
     
     return {
-        "timestamp": measurement.created_at.isoformat() if measurement.created_at else None,
-        "temperature": measurement.dht_temperature,
-        "humidity": measurement.dht_humidity,
-        "pressure": measurement.bmp_pressure,
-        "pm1_0": measurement.pms_pm_1,
-        "pm2_5": measurement.pms_pm_2p5,
-        "pm10_0": measurement.pms_pm_10,
-        "battery_voltage": measurement.battery_voltage,
-        "battery_percent": measurement.battery_level,
+        "timestamp": measurement.time.isoformat() if measurement.time else None,
+        "temperature": float(measurement.temperature) if measurement.temperature else None,
+        "humidity": measurement.humidity,
+        "pressure": measurement.pressure,
+        "pm2_5": measurement.PM25,
+        "pm10_0": measurement.PM10,
+        "latitude": measurement.latitude,
+        "longitude": measurement.longitude,
     }
 
 
