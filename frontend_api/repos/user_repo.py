@@ -1,6 +1,6 @@
-from sqlite3 import IntegrityError
 from fastapi import HTTPException
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -96,12 +96,15 @@ async def create_user(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="User exists"
         )
 
+    db_user = User(**user.model_dump(), type=UserType.CLIENT)
+    db.add(db_user)
     try:
-        db_user = User(**user.model_dump(), type=UserType.CLIENT)
-        db.add(db_user)
         await db.commit()
         await db.refresh(db_user)
         return db_user
-    except IntegrityError as e:
+    except IntegrityError:
         await db.rollback()
-        raise ValueError(f"Database error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, 
+            detail="User already exists or database constraint violation"
+        )
