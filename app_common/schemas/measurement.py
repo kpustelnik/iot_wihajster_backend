@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 
 
 class Timescale(StrEnum):
+    LIVE = "live"       # Last 5 minutes, raw data
+    HOUR = "hour"       # Last hour, 1-minute granularity
+    HOURS_6 = "hours_6" # Last 6 hours, 5-minute granularity
     DAY = "day"
     WEEK = "week"
     MONTH = "month"
