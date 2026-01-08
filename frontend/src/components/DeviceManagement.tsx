@@ -6,6 +6,7 @@ import { Button, Typography, Box, Tabs, Tab } from "@mui/material";
 import DeviceManagementInfo from "./DeviceManagementInfo";
 import DeviceManagementWifi from "./DeviceManagementWifi";
 import DeviceManagementSensors from "./DeviceManagementSensors";
+import DeviceManagementLed from "./DeviceManagementLed";
 
 function CustomTabPanel(props: {
   children?: React.ReactNode;
@@ -40,6 +41,7 @@ export default function DeviceManagement({ server, setServer }: {
           <Tab label="Informations" />
           <Tab label="WiFi Configuration" />
           <Tab label="Sensors" />
+          <Tab label="LED" />
         </Tabs>
       </Box>
       <CustomTabPanel value={tab} index={0}>
@@ -50,6 +52,9 @@ export default function DeviceManagement({ server, setServer }: {
       </CustomTabPanel>
       <CustomTabPanel value={tab} index={2}>
         <DeviceManagementSensors server={server} />
+      </CustomTabPanel>
+      <CustomTabPanel value={tab} index={3}>
+        <DeviceManagementLed server={server} />
       </CustomTabPanel>
     </>
   );
