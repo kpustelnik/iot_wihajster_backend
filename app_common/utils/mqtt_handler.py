@@ -44,28 +44,12 @@ def create_tls_context():
         # Download Amazon Root CA if not present
         download_aws_root_ca()
         
-        # AWS IoT Core - use Amazon Root CA and CA certificate from servers/
+        # AWS IoT Core - use Amazon Root CA and mqtt_server certificate
         context.load_verify_locations(AWS_ROOT_CA_PATH)
-        
-        # Find the CA certificate and key in /certs/servers/ (registered with AWS IoT)
-        certs_dir = "/certs/servers"
-        ca_cert = None
-        ca_key = None
-        
-        try:
-            for f in os.listdir(certs_dir):
-                if f.startswith("CA_") and f.endswith("_cert.crt"):
-                    ca_cert = os.path.join(certs_dir, f)
-                elif f.startswith("CA_") and f.endswith("_key.key"):
-                    ca_key = os.path.join(certs_dir, f)
-        except FileNotFoundError:
-            pass
-        
-        if ca_cert and ca_key:
-            context.load_cert_chain(certfile=ca_cert, keyfile=ca_key)
-        else:
-            raise RuntimeError("CA certificate for AWS IoT not found in /certs/servers/")
-        
+        context.load_cert_chain(
+            certfile="/certs/servers/mqtt_server.crt",
+            keyfile="/certs/servers/mqtt_server.key"
+        )
         context.check_hostname = True
         context.verify_mode = ssl.CERT_REQUIRED
     else:
