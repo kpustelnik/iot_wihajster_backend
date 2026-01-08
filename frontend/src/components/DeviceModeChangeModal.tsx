@@ -7,6 +7,7 @@ import BLEServiceEnum from "@/lib/BLEServiceEnum";
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 
 import { BluetoothQueueContext } from '@/components/BluetoothQueueProvider';
+import { useSnackbar } from "@/contexts/SnackbarContext";
 
 export default function DeviceModeChangeModal({
   open,
@@ -26,6 +27,7 @@ export default function DeviceModeChangeModal({
   setServer: (server: BluetoothRemoteGATTServer | null) => void;
 }) {
   const bluetoothQueueContext = React.useContext(BluetoothQueueContext);
+  const { showError, showInfo } = useSnackbar();
 
   const [selectedDeviceMode, setSelectedDeviceMode] = React.useState(currentDeviceMode);
   const [isUpdatingDeviceMode, setIsUpdatingDeviceMode] = React.useState(false);
@@ -69,16 +71,26 @@ export default function DeviceModeChangeModal({
               if (isUpdatingDeviceMode) return;
               setIsUpdatingDeviceMode(true);
 
-              const basicInfoService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.BASIC_INFO_SERVICE));
-              if (!basicInfoService) return;
-              
-              const deviceModeCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_MODE));
-              await bluetoothQueueContext.enqueue(() => deviceModeCharacteristic.writeValueWithResponse(new Uint8Array([ selectedDeviceMode ])));
+              try {
+                const basicInfoService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.BASIC_INFO_SERVICE));
+                if (!basicInfoService) {
+                  showError('Failed to get device service');
+                  return;
+                }
+                
+                const deviceModeCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_MODE));
+                await bluetoothQueueContext.enqueue(() => deviceModeCharacteristic.writeValueWithResponse(new Uint8Array([ selectedDeviceMode ])));
 
-              setDeviceMode(selectedDeviceMode);
-              setServer(null);
-              setIsUpdatingDeviceMode(false);
-              onClose();
+                setDeviceMode(selectedDeviceMode);
+                showInfo('Device mode changed. Device will reboot.');
+                setServer(null);
+                onClose();
+              } catch (err: unknown) {
+                const error = err as Error;
+                showError(`Failed to change device mode: ${error.message}`);
+              } finally {
+                setIsUpdatingDeviceMode(false);
+              }
             }
           }
         >Update</Button>

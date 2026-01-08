@@ -57,12 +57,18 @@ class OtaUpdateCommand(CommandRequest):
     url: str = Field(..., description="URL do firmware binary (HTTPS)")
 
 
-class AlarmThresholdsCommand(CommandRequest):
-    """Komenda ustawienia progów alarmowych"""
-    pm25_high: Optional[int] = Field(None, description="Próg wysokiego PM2.5 (µg/m³)")
-    pm10_high: Optional[int] = Field(None, description="Próg wysokiego PM10 (µg/m³)")
-    temp_low: Optional[float] = Field(None, description="Próg niskiej temperatury (°C)")
-    temp_high: Optional[float] = Field(None, description="Próg wysokiej temperatury (°C)")
+# NOTE: Alarmy zakomentowane - koncept do przemyślenia
+# class AlarmThresholdsCommand(CommandRequest):
+#     """Komenda ustawienia progów alarmowych"""
+#     pm25_high: Optional[int] = Field(None, description="Próg wysokiego PM2.5 (µg/m³)")
+#     pm10_high: Optional[int] = Field(None, description="Próg wysokiego PM10 (µg/m³)")
+#     temp_low: Optional[float] = Field(None, description="Próg niskiej temperatury (°C)")
+#     temp_high: Optional[float] = Field(None, description="Próg wysokiej temperatury (°C)")
+
+
+class Bmp280SettingsCommand(CommandRequest):
+    """Komenda ustawienia parametrów czujnika BMP280"""
+    settings: int = Field(..., ge=0, le=65535, description="BMP280 settings (uint16): bits 0-2: filter, bits 3-5: pressure oversampling, bits 6-8: temperature oversampling")
 
 
 class WifiConfigCommand(CommandRequest):
@@ -300,35 +306,70 @@ async def get_ota_status(
     )
 
 
+# NOTE: Alarmy zakomentowane - koncept do przemyślenia
+# @router.post(
+#     "/alarms/thresholds",
+#     response_model=CommandResponse,
+#     status_code=status.HTTP_200_OK,
+#     summary="Set alarm thresholds",
+# )
+# async def set_alarm_thresholds(
+#     cmd: AlarmThresholdsCommand,
+#     current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     """Ustaw progi alarmowe na urządzeniu."""
+#     await verify_device_ownership(db, cmd.device_id, current_user)
+#     
+#     params = {}
+#     if cmd.pm25_high is not None:
+#         params["pm25_high"] = cmd.pm25_high
+#     if cmd.pm10_high is not None:
+#         params["pm10_high"] = cmd.pm10_high
+#     if cmd.temp_low is not None:
+#         params["temp_low"] = cmd.temp_low
+#     if cmd.temp_high is not None:
+#         params["temp_high"] = cmd.temp_high
+#     
+#     success = await publish_command(str(cmd.device_id), "set_alarm_thresholds", params)
+#     
+#     return CommandResponse(
+#         success=success,
+#         message="Alarm thresholds command sent" if success else "Failed to send command",
+#         device_id=cmd.device_id
+#     )
+
+
 @router.post(
-    "/alarms/thresholds",
+    "/sensor/bmp280",
     response_model=CommandResponse,
     status_code=status.HTTP_200_OK,
-    summary="Set alarm thresholds",
+    summary="Set BMP280 sensor settings",
 )
-async def set_alarm_thresholds(
-    cmd: AlarmThresholdsCommand,
+async def set_bmp280_settings(
+    cmd: Bmp280SettingsCommand,
     current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Ustaw progi alarmowe na urządzeniu."""
+    """
+    Ustaw parametry czujnika BMP280.
+    
+    Format settings (uint16):
+    - bits 0-2: IIR filter coefficient (0=off, 1=2x, 2=4x, 3=8x, 4=16x)
+    - bits 3-5: pressure oversampling (0=skip, 1=1x, 2=2x, 3=4x, 4=8x, 5=16x)
+    - bits 6-8: temperature oversampling (0=skip, 1=1x, 2=2x, 3=4x, 4=8x, 5=16x)
+    """
     await verify_device_ownership(db, cmd.device_id, current_user)
     
-    params = {}
-    if cmd.pm25_high is not None:
-        params["pm25_high"] = cmd.pm25_high
-    if cmd.pm10_high is not None:
-        params["pm10_high"] = cmd.pm10_high
-    if cmd.temp_low is not None:
-        params["temp_low"] = cmd.temp_low
-    if cmd.temp_high is not None:
-        params["temp_high"] = cmd.temp_high
-    
-    success = await publish_command(str(cmd.device_id), "set_alarm_thresholds", params)
+    success = await publish_command(
+        str(cmd.device_id),
+        "set_bmp280",
+        {"settings": cmd.settings}
+    )
     
     return CommandResponse(
         success=success,
-        message="Alarm thresholds command sent" if success else "Failed to send command",
+        message="BMP280 settings command sent" if success else "Failed to send command",
         device_id=cmd.device_id
     )
 

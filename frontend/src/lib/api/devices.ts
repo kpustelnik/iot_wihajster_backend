@@ -92,4 +92,21 @@ export const devicesApi = {
         const response = await axios.post<{message: string; device_id: number}>('/devices/release', { device_id: deviceId });
         return response.data;
     },
+
+    /**
+     * Get latest sensor readings for a device
+     */
+    getLatestSensors: async (deviceId: number) => {
+        const response = await axios.get<{
+            timestamp: string | null;
+            temperature: number | null;
+            humidity: number | null;
+            pressure: number | null;
+            pm2_5: number | null;
+            pm10_0: number | null;
+            latitude: number | null;
+            longitude: number | null;
+        }>(`/devices/${deviceId}/sensors/latest`);
+        return response.data;
+    },
 };
