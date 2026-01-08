@@ -570,23 +570,22 @@ async def get_device_sensors_history(
     result = await db.execute(
         select(Measurement)
         .where(Measurement.device_id == device_id)
-        .where(Measurement.created_at >= since)
-        .order_by(Measurement.created_at.asc())
+        .where(Measurement.time >= since)
+        .order_by(Measurement.time.asc())
         .limit(1000)
     )
     measurements = result.scalars().all()
     
     return [
         {
-            "timestamp": m.created_at.isoformat() if m.created_at else None,
-            "temperature": m.dht_temperature,
-            "humidity": m.dht_humidity,
-            "pressure": m.bmp_pressure,
-            "pm1_0": m.pms_pm_1,
-            "pm2_5": m.pms_pm_2p5,
-            "pm10_0": m.pms_pm_10,
-            "battery_voltage": m.battery_voltage,
-            "battery_percent": m.battery_level,
+            "timestamp": m.time.isoformat() if m.time else None,
+            "temperature": float(m.temperature) if m.temperature else None,
+            "humidity": m.humidity,
+            "pressure": m.pressure,
+            "pm2_5": m.PM25,
+            "pm10_0": m.PM10,
+            "latitude": m.latitude,
+            "longitude": m.longitude,
         }
         for m in measurements
     ]
