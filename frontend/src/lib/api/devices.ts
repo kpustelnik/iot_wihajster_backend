@@ -58,4 +58,30 @@ export const devicesApi = {
         const response = await axios.get<LimitedResponse<DeviceModel>>(API_ENDPOINTS.devices.list);
         return response.data;
     },
+
+    /**
+     * Get device details
+     */
+    get: async (deviceId: number) => {
+        const response = await axios.get<DeviceModel>(`/devices/${deviceId}`);
+        return response.data;
+    },
+
+    /**
+     * Claim a device (register to account)
+     * Note: Device must be released first and factory reset performed
+     */
+    claim: async (deviceId: number) => {
+        const response = await axios.post<DeviceModel>('/devices/claim', { device_id: deviceId });
+        return response.data;
+    },
+
+    /**
+     * Release device ownership
+     * After releasing, perform factory reset on device (hold BOOT 10s)
+     */
+    release: async (deviceId: number) => {
+        const response = await axios.post<{message: string; device_id: number}>('/devices/release', { device_id: deviceId });
+        return response.data;
+    },
 };

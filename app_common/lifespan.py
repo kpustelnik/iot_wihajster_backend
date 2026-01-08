@@ -19,13 +19,14 @@ async def fix_postgres_sequences(session):
     This ensures auto-increment IDs continue from the correct value.
     """
     # List of tables with sequences that need fixing
+    # Table names must match actual PostgreSQL table names (usually plural)
     tables_with_sequences = [
         ('users', 'users_id_seq'),
-        ('device', 'device_id_seq'),
-        ('family', 'family_id_seq'),
-        ('family_member', 'family_member_id_seq'),
-        ('family_device', 'family_device_id_seq'),
-        ('measurement', 'measurement_id_seq'),
+        ('devices', 'devices_id_seq'),
+        ('families', 'families_id_seq'),
+        ('family_members', 'family_members_id_seq'),
+        ('family_devices', 'family_devices_id_seq'),
+        ('measurements', 'measurements_id_seq'),
     ]
     
     for table_name, seq_name in tables_with_sequences:
