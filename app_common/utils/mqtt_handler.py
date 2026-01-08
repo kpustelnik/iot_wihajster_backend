@@ -120,6 +120,7 @@ async def save_sensor_data_to_db(device_id: int, data: dict):
         bmp280 = data.get("bmp280", {})
         pms5003 = data.get("pms5003", {})
         battery = data.get("battery", {})
+        gps = data.get("gps", {})
         
         temperature = Decimal(str(dht22.get("temperature", 0))) if dht22.get("valid") else None
         humidity = int(dht22.get("humidity", 0)) if dht22.get("valid") else None
@@ -127,6 +128,8 @@ async def save_sensor_data_to_db(device_id: int, data: dict):
         pm25 = int(pms5003.get("pm2_5", 0)) if pms5003.get("valid") else None
         pm10 = int(pms5003.get("pm10", 0)) if pms5003.get("valid") else None
         battery_percent = battery.get("percent") if battery.get("valid") else None
+        latitude = float(gps.get("latitude", 0)) if gps.get("valid") else None
+        longitude = float(gps.get("longitude", 0)) if gps.get("valid") else None
         
         # Create measurement record
         measurement = Measurement(
@@ -137,6 +140,8 @@ async def save_sensor_data_to_db(device_id: int, data: dict):
             pressure=pressure,
             PM25=pm25,
             PM10=pm10,
+            latitude=latitude,
+            longitude=longitude,
         )
         
         session.add(measurement)
@@ -191,11 +196,6 @@ async def process_sensor_message(topic: str, payload: str):
         
         # Save to database
         await save_sensor_data_to_db(device_id, data)
-        
-        # Forward to subscribers (status topic for frontend/mobile)
-        if _mqtt_client:
-            await _mqtt_client.publish(f"data_update/{device_id}", payload=payload)
-            logger.debug(f"[MQTT] Forwarded sensor data to data_update/{device_id}")
         
     except Exception as e:
         logger.error(f"[MQTT] Error processing sensor message: {e!r}")
