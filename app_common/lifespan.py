@@ -8,8 +8,43 @@ from app_common.database import sessionmanager
 import asyncio
 from app_common.utils.mqtt_handler import mqtt_runner
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
 
 logger = logging.getLogger('uvicorn.error')
+
+
+async def fix_postgres_sequences(session):
+    """
+    Fix PostgreSQL sequences after inserting data with explicit IDs.
+    This ensures auto-increment IDs continue from the correct value.
+    """
+    # List of tables with sequences that need fixing
+    tables_with_sequences = [
+        ('users', 'users_id_seq'),
+        ('device', 'device_id_seq'),
+        ('family', 'family_id_seq'),
+        ('family_member', 'family_member_id_seq'),
+        ('family_device', 'family_device_id_seq'),
+        ('measurement', 'measurement_id_seq'),
+    ]
+    
+    for table_name, seq_name in tables_with_sequences:
+        try:
+            # Check if table exists and has data
+            result = await session.execute(
+                text(f"SELECT COALESCE(MAX(id), 0) + 1 FROM {table_name}")
+            )
+            next_val = result.scalar()
+            
+            # Update sequence
+            await session.execute(
+                text(f"SELECT setval('{seq_name}', {next_val}, false)")
+            )
+            logger.info(f"Fixed sequence {seq_name} to start at {next_val}")
+        except Exception as e:
+            logger.warning(f"Could not fix sequence {seq_name}: {e}")
+    
+    await session.commit()
 
 
 @asynccontextmanager
@@ -27,6 +62,10 @@ async def lifespan(_app: FastAPI):
                 await session.flush()
             await session.commit()
             logger.info("Entries added to database")
+            
+            # Fix PostgreSQL sequences after loading test data
+            await fix_postgres_sequences(session)
+            
         except IntegrityError as e:
             logger.warning("IntegrityError while adding entries to database")
             logger.warning(f"Database error: {str(e)}")

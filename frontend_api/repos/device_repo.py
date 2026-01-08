@@ -1,4 +1,4 @@
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 
 from sqlalchemy import select, distinct, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession

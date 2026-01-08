@@ -1,4 +1,4 @@
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 
 from fastapi import HTTPException
 from sqlalchemy import func, select, or_, distinct

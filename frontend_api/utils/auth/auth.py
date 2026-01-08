@@ -60,6 +60,11 @@ async def get_current_user(response: Response, token_data: Annotated[tuple[str, 
     user = await get_user(db, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token user not found")
+    
+    # Expunge user from session to prevent MissingGreenlet errors
+    # when accessing user attributes outside this session context
+    await db.refresh(user)
+    db.expunge(user)
     return user
 
 

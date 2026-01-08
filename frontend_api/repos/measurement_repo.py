@@ -1,6 +1,6 @@
 from datetime import datetime
 import json
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 
 from sqlalchemy import func, select, or_, and_, cast, String, Integer
