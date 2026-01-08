@@ -31,6 +31,9 @@ export enum FamilyStatus {
 }
 
 export enum Timescale {
+    LIVE = 'live',
+    HOUR = 'hour',
+    HOURS_6 = 'hours_6',
     DAY = 'day',
     WEEK = 'week',
     MONTH = 'month',
