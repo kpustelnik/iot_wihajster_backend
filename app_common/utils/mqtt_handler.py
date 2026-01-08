@@ -192,11 +192,6 @@ async def process_sensor_message(topic: str, payload: str):
         # Save to database
         await save_sensor_data_to_db(device_id, data)
         
-        # Forward to subscribers (status topic for frontend/mobile)
-        if _mqtt_client:
-            await _mqtt_client.publish(f"data_update/{device_id}", payload=payload)
-            logger.debug(f"[MQTT] Forwarded sensor data to data_update/{device_id}")
-        
     except Exception as e:
         logger.error(f"[MQTT] Error processing sensor message: {e!r}")
 
