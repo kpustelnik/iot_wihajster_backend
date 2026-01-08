@@ -2,6 +2,7 @@ import * as React from "react";
 import { Typography, Box, Button, CircularProgress, Checkbox, FormControlLabel, Alert } from "@mui/material";
 
 import { BluetoothQueueContext } from '@/components/BluetoothQueueProvider';
+import { useSnackbar } from "@/contexts/SnackbarContext";
 
 import BLEServiceEnum from "@/lib/BLEServiceEnum";
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
@@ -15,6 +16,7 @@ export default function LTEChangeModal({ open, onClose, server, currentLteEnable
   setCurrentLteEnable: (enable: boolean) => void;
 }) {
   const bluetoothQueueContext = React.useContext(BluetoothQueueContext);
+  const { showError, showSuccess } = useSnackbar();
 
   const [newLteEnable, setNewLteEnable] = React.useState(currentLteEnable);
 
@@ -44,15 +46,21 @@ export default function LTEChangeModal({ open, onClose, server, currentLteEnable
               if (isUpdating) return;
               setIsUpdating(true);
 
-              const lteGpsService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.LTE_GPS_SERVICE));
-              
-              const lteEnableCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.ENABLE_LTE));
-              await bluetoothQueueContext.enqueue(() => lteEnableCharacteristic.writeValueWithResponse(new Uint8Array([newLteEnable ? 1 : 0])));
+              try {
+                const lteGpsService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.LTE_GPS_SERVICE));
+                
+                const lteEnableCharacteristic = await bluetoothQueueContext.enqueue(() => lteGpsService.getCharacteristic(BLECharacteristicEnum.ENABLE_LTE));
+                await bluetoothQueueContext.enqueue(() => lteEnableCharacteristic.writeValueWithResponse(new Uint8Array([newLteEnable ? 1 : 0])));
 
-              setCurrentLteEnable(newLteEnable);
-
-              setIsUpdating(false);
-              onClose();
+                setCurrentLteEnable(newLteEnable);
+                showSuccess(`LTE ${newLteEnable ? 'enabled' : 'disabled'} successfully!`);
+                onClose();
+              } catch (err: unknown) {
+                const error = err as Error;
+                showError(`Failed to update LTE settings: ${error.message}`);
+              } finally {
+                setIsUpdating(false);
+              }
             }
           }
         >Update</Button>

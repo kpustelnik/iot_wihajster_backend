@@ -2,6 +2,7 @@ import * as React from "react";
 import { Typography, Box, Button, CircularProgress, FormControl, Skeleton, RadioGroup, Radio, FormControlLabel, FormLabel, Grid } from "@mui/material";
 
 import { BluetoothQueueContext } from '@/components/BluetoothQueueProvider';
+import { useSnackbar } from "@/contexts/SnackbarContext";
 
 import BLEServiceEnum from "@/lib/BLEServiceEnum";
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
@@ -20,6 +21,7 @@ export default function BMP280SettingsModal({ open, onClose, server }: {
   server: BluetoothRemoteGATTServer;
 }) {
   const bluetoothQueueContext = React.useContext(BluetoothQueueContext);
+  const { showError, showSuccess } = useSnackbar();
   
   const [newBMP280Settings, setNewBMP280Settings] = React.useState<BMP280Settings>({ oversamplingTemp: 0, oversamplingPress: 0, filter: 0, standbyTime: 0 });
 
@@ -146,17 +148,24 @@ export default function BMP280SettingsModal({ open, onClose, server }: {
               if (isUpdating) return;
               setIsUpdating(true);
 
-              const sensorsService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.SENSORS_SERVICE));
+              try {
+                const sensorsService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.SENSORS_SERVICE));
 
-              const bmp280SettingsCharacteristic = await bluetoothQueueContext.enqueue(() => sensorsService.getCharacteristic(BLECharacteristicEnum.BMP280_SETTINGS));
-              await bluetoothQueueContext.enqueue(() => bmp280SettingsCharacteristic.writeValueWithResponse(new Uint16Array([
-                (newBMP280Settings.oversamplingPress & 0b111) |
-                ((newBMP280Settings.oversamplingTemp & 0b111) << 3) |
-                ((newBMP280Settings.filter & 0b111) << 6) |
-                ((newBMP280Settings.standbyTime & 0b111) << 9)
-              ])));
-              setIsUpdating(false);
-              onClose();
+                const bmp280SettingsCharacteristic = await bluetoothQueueContext.enqueue(() => sensorsService.getCharacteristic(BLECharacteristicEnum.BMP280_SETTINGS));
+                await bluetoothQueueContext.enqueue(() => bmp280SettingsCharacteristic.writeValueWithResponse(new Uint16Array([
+                  (newBMP280Settings.oversamplingPress & 0b111) |
+                  ((newBMP280Settings.oversamplingTemp & 0b111) << 3) |
+                  ((newBMP280Settings.filter & 0b111) << 6) |
+                  ((newBMP280Settings.standbyTime & 0b111) << 9)
+                ])));
+                showSuccess('BMP280 settings updated successfully!');
+                onClose();
+              } catch (err: unknown) {
+                const error = err as Error;
+                showError(`Failed to update BMP280 settings: ${error.message}`);
+              } finally {
+                setIsUpdating(false);
+              }
             }
           }
         >Update</Button>
