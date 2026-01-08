@@ -52,10 +52,18 @@ export const devicesApi = {
     },
 
     /**
-     * List all devices
+     * List all devices (owned + via families)
      */
     list: async () => {
         const response = await axios.get<LimitedResponse<DeviceModel>>(API_ENDPOINTS.devices.list);
+        return response.data;
+    },
+
+    /**
+     * List only directly owned devices (bound via BLE handshake)
+     */
+    listOwned: async () => {
+        const response = await axios.get<LimitedResponse<DeviceModel>>('/devices/owned');
         return response.data;
     },
 

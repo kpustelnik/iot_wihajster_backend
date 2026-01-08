@@ -38,6 +38,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - AWS_CA_REGISTRATION_CODE=${AWS_CA_REGISTRATION_CODE}
+      - USE_AWS_MQTT=${USE_AWS_MQTT}
+      - AWS_IOT_ENDPOINT=${AWS_IOT_ENDPOINT}
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +64,8 @@ services:
       - POSTGRES_HOSTNAME=postgres
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - USE_AWS_MQTT=${USE_AWS_MQTT}
+      - AWS_IOT_ENDPOINT=${AWS_IOT_ENDPOINT}
     depends_on:
       frontend_api:
         condition: service_healthy

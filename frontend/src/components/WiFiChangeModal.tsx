@@ -2,6 +2,7 @@ import * as React from "react";
 import { Typography, Box, Button, CircularProgress, TextField, FormControl, InputLabel, Select, MenuItem, Skeleton, RadioGroup, Radio, FormControlLabel } from "@mui/material";
 
 import { BluetoothQueueContext } from '@/components/BluetoothQueueProvider';
+import { useSnackbar } from "@/contexts/SnackbarContext";
 
 import WiFiAuthModeEnum, { WiFiAuthModeNameEnum } from "@/lib/WiFiAuthModeEnum";
 import BLEServiceEnum from "@/lib/BLEServiceEnum";
@@ -24,6 +25,7 @@ export default function WiFiChangeModal({ open, onClose, server, currentWiFiSSID
   setCurrentWiFiWPA: (wpa: number) => void;
 }) {
   const bluetoothQueueContext = React.useContext(BluetoothQueueContext);
+  const { showError, showSuccess } = useSnackbar();
 
   const [newWifiSSID, setNewWifiSSID] = React.useState(currentWiFiSSID);
   const [newWifiPass, setNewWifiPass] = React.useState('');
@@ -73,25 +75,31 @@ export default function WiFiChangeModal({ open, onClose, server, currentWiFiSSID
               if (isUpdating) return;
               setIsUpdating(true);
 
-              const wifiService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.WIFI_SERVICE));
+              try {
+                const wifiService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.WIFI_SERVICE));
 
-              const wifiSSIDCharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_SSID));
-              const wifiPassCharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_PASS));
-              const wifiWPACharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_WPA));
-              await Promise.all([
-                bluetoothQueueContext.enqueue(() => wifiSSIDCharacteristic.writeValueWithResponse(new TextEncoder().encode(newWifiSSID))),
-                bluetoothQueueContext.enqueue(() => wifiPassCharacteristic.writeValueWithResponse(new TextEncoder().encode(newWifiPass))),
-                bluetoothQueueContext.enqueue(() => wifiWPACharacteristic.writeValueWithResponse(new Uint8Array([newWifiWPA])))
-              ]);
-              
-              const wifiConnectCharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_CONNECT));
-              await bluetoothQueueContext.enqueue(() => wifiConnectCharacteristic.writeValueWithResponse(new Uint8Array([1])));
+                const wifiSSIDCharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_SSID));
+                const wifiPassCharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_PASS));
+                const wifiWPACharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_WPA));
+                await Promise.all([
+                  bluetoothQueueContext.enqueue(() => wifiSSIDCharacteristic.writeValueWithResponse(new TextEncoder().encode(newWifiSSID))),
+                  bluetoothQueueContext.enqueue(() => wifiPassCharacteristic.writeValueWithResponse(new TextEncoder().encode(newWifiPass))),
+                  bluetoothQueueContext.enqueue(() => wifiWPACharacteristic.writeValueWithResponse(new Uint8Array([newWifiWPA])))
+                ]);
+                
+                const wifiConnectCharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_CONNECT));
+                await bluetoothQueueContext.enqueue(() => wifiConnectCharacteristic.writeValueWithResponse(new Uint8Array([1])));
 
-              setCurrentWiFiSSID(newWifiSSID);
-              setCurrentWiFiWPA(newWifiWPA);
-
-              setIsUpdating(false);
-              onClose();
+                setCurrentWiFiSSID(newWifiSSID);
+                setCurrentWiFiWPA(newWifiWPA);
+                showSuccess('WiFi settings updated successfully!');
+                onClose();
+              } catch (err: unknown) {
+                const error = err as Error;
+                showError(`Failed to update WiFi: ${error.message}`);
+              } finally {
+                setIsUpdating(false);
+              }
             }
           }
         >Update</Button>
@@ -104,22 +112,27 @@ export default function WiFiChangeModal({ open, onClose, server, currentWiFiSSID
         onClick={async () => {
           if (isScanningNetworks) return;
           setIsScanningNetworks(true);
-          const wifiService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.WIFI_SERVICE))
+          try {
+            const wifiService = await bluetoothQueueContext.enqueue(() => server.getPrimaryService(BLEServiceEnum.WIFI_SERVICE))
 
-          const wifiScanCharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_SCAN))
-          const value = await bluetoothQueueContext.enqueue(() => wifiScanCharacteristic.readValue());
-          const stringValue: string = new TextDecoder().decode(value);
-          const networks: Array<WiFiNetwork> = stringValue.split(';').filter(x => x.trim() != '').map(entry => {
-            const parts = entry.split(',');
-            return {
-              ssid: parts[0],
-              authMode: parseInt(parts[2], 10) as WiFiAuthModeEnum,
-              rssi: parseInt(parts[1], 10)
-            };
-          });
-          setNetworks(networks);
-
-          setIsScanningNetworks(false);
+            const wifiScanCharacteristic = await bluetoothQueueContext.enqueue(() => wifiService.getCharacteristic(BLECharacteristicEnum.WIFI_SCAN))
+            const value = await bluetoothQueueContext.enqueue(() => wifiScanCharacteristic.readValue());
+            const stringValue: string = new TextDecoder().decode(value);
+            const networks: Array<WiFiNetwork> = stringValue.split(';').filter(x => x.trim() != '').map(entry => {
+              const parts = entry.split(',');
+              return {
+                ssid: parts[0],
+                authMode: parseInt(parts[2], 10) as WiFiAuthModeEnum,
+                rssi: parseInt(parts[1], 10)
+              };
+            });
+            setNetworks(networks);
+          } catch (err: unknown) {
+            const error = err as Error;
+            showError(`Failed to scan networks: ${error.message}`);
+          } finally {
+            setIsScanningNetworks(false);
+          }
         }}
       >Scan available networks</Button>
       {

@@ -2,6 +2,8 @@ import ssl
 import asyncio
 import logging
 import json
+import os
+import urllib.request
 from datetime import datetime
 from typing import Optional
 from aiomqtt import Client, MqttError
@@ -11,19 +13,70 @@ from app_common.database import sessionmanager
 from app_common.models.measurement import Measurement
 from app_common.models.device import Device
 
+# AWS IoT configuration
+USE_AWS_MQTT = os.getenv("USE_AWS_MQTT", "true").lower() == "true"
+AWS_ROOT_CA_URL = "https://www.amazontrust.com/repository/AmazonRootCA1.pem"
+AWS_ROOT_CA_PATH = "/certs/AmazonRootCA.pem"
+AWS_IOT_ENDPOINT = os.getenv("AWS_IOT_ENDPOINT", "a19l9pjpkjjlvv-ats.iot.us-east-1.amazonaws.com")
+
+
+def download_aws_root_ca():
+    """Download Amazon Root CA if it doesn't exist."""
+    if os.path.exists(AWS_ROOT_CA_PATH):
+        return
+    
+    print(f"[MQTT] Downloading Amazon Root CA from {AWS_ROOT_CA_URL}...")
+    try:
+        with urllib.request.urlopen(AWS_ROOT_CA_URL, timeout=15) as response:
+            cert_data = response.read().decode('utf-8')
+        
+        with open(AWS_ROOT_CA_PATH, 'w') as f:
+            f.write(cert_data)
+        print(f"[MQTT] Amazon Root CA saved to {AWS_ROOT_CA_PATH}")
+    except Exception as e:
+        print(f"[MQTT] Failed to download Amazon Root CA: {e}")
+        raise
 
 def create_tls_context():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
-    context.load_verify_locations("/certs/ca_cert.crt")  # Root CA
-    # TODO: Replace with AWS cert in case of AWS
-    context.load_cert_chain(
-        certfile="/certs/mqtt_server.crt",
-        keyfile="/certs/mqtt_server.key"
-    )
-
-    context.check_hostname = False  # AWS IoT Core ma unikalny endpoint, ale i tak jest OK
-    context.verify_mode = ssl.CERT_REQUIRED
+    if USE_AWS_MQTT:
+        # Download Amazon Root CA if not present
+        download_aws_root_ca()
+        
+        # AWS IoT Core - use Amazon Root CA and CA certificate from servers/
+        context.load_verify_locations(AWS_ROOT_CA_PATH)
+        
+        # Find the CA certificate and key in /certs/servers/ (registered with AWS IoT)
+        certs_dir = "/certs/servers"
+        ca_cert = None
+        ca_key = None
+        
+        try:
+            for f in os.listdir(certs_dir):
+                if f.startswith("CA_") and f.endswith("_cert.crt"):
+                    ca_cert = os.path.join(certs_dir, f)
+                elif f.startswith("CA_") and f.endswith("_key.key"):
+                    ca_key = os.path.join(certs_dir, f)
+        except FileNotFoundError:
+            pass
+        
+        if ca_cert and ca_key:
+            context.load_cert_chain(certfile=ca_cert, keyfile=ca_key)
+        else:
+            raise RuntimeError("CA certificate for AWS IoT not found in /certs/servers/")
+        
+        context.check_hostname = True
+        context.verify_mode = ssl.CERT_REQUIRED
+    else:
+        # Local MQTT broker
+        context.load_verify_locations("/certs/ca_cert.crt")
+        context.load_cert_chain(
+            certfile="/certs/mqtt_server.crt",
+            keyfile="/certs/mqtt_server.key"
+        )
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_REQUIRED
 
     return context
 
@@ -37,10 +90,17 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-MQTT_HOST = "mqtt_ext"
-MQTT_PORT = 2883
+# MQTT Configuration
+if USE_AWS_MQTT:
+    MQTT_HOST = AWS_IOT_ENDPOINT
+    MQTT_PORT = 8883
+else:
+    MQTT_HOST = "mqtt_ext"
+    MQTT_PORT = 2883
+
 MQTT_TOPIC_SENSORS = "sensors/#"
 MQTT_TOPIC_STATUS = "status/#"
+MQTT_TOPIC_PRESENCE = "presence/#"
 
 # Global MQTT client reference for publishing
 _mqtt_client: Optional[Client] = None
@@ -50,14 +110,14 @@ async def save_sensor_data_to_db(device_id: int, data: dict):
     """
     Zapisuje dane z sensorów do bazy danych.
     
-    Struktura danych z ESP32:
+    Format danych (jednolity dla WiFi i LTE):
     {
         "timestamp": 1735900000,
         "dht22": {"temperature": 23.5, "humidity": 45.2, "valid": true},
         "bmp280": {"pressure": 101325, "temperature": 23.1, "valid": true},
         "pms5003": {"pm1_0": 10, "pm2_5": 25, "pm10": 35, "valid": true},
         "battery": {"voltage_mv": 4200, "percent": 100, "valid": true},
-        "source": "WIFI",
+        "source": "WIFI" | "LTE",
         "device_id": "1"
     }
     """
@@ -71,35 +131,43 @@ async def save_sensor_data_to_db(device_id: int, data: dict):
         else:
             measurement_time = datetime.utcnow()
         
-        # Extract sensor values
+        # Extract sensor values from nested objects
         dht22 = data.get("dht22", {})
         bmp280 = data.get("bmp280", {})
         pms5003 = data.get("pms5003", {})
         battery = data.get("battery", {})
         
+        temperature = Decimal(str(dht22.get("temperature", 0))) if dht22.get("valid") else None
+        humidity = int(dht22.get("humidity", 0)) if dht22.get("valid") else None
+        pressure = int(bmp280.get("pressure", 0)) if bmp280.get("valid") else None
+        pm25 = int(pms5003.get("pm2_5", 0)) if pms5003.get("valid") else None
+        pm10 = int(pms5003.get("pm10", 0)) if pms5003.get("valid") else None
+        battery_percent = battery.get("percent") if battery.get("valid") else None
+        
         # Create measurement record
         measurement = Measurement(
             device_id=device_id,
             time=measurement_time,
-            temperature=Decimal(str(dht22.get("temperature", 0))) if dht22.get("valid") else None,
-            humidity=int(dht22.get("humidity", 0)) if dht22.get("valid") else None,
-            pressure=int(bmp280.get("pressure", 0)) if bmp280.get("valid") else None,
-            PM25=int(pms5003.get("pm2_5", 0)) if pms5003.get("valid") else None,
-            PM10=int(pms5003.get("pm10", 0)) if pms5003.get("valid") else None,
+            temperature=temperature,
+            humidity=humidity,
+            pressure=pressure,
+            PM25=pm25,
+            PM10=pm10,
         )
         
         session.add(measurement)
         
-        # Update device battery status if valid
-        if battery.get("valid"):
+        # Update device battery status if available
+        if battery_percent is not None:
             from sqlalchemy import update
             stmt = update(Device).where(Device.id == device_id).values(
-                battery=battery.get("percent")
+                battery=battery_percent
             )
             await session.execute(stmt)
         
         await session.commit()
-        logger.info(f"[MQTT] Saved measurement for device {device_id} at {measurement_time}")
+        source = data.get("source", "UNKNOWN")
+        logger.info(f"[MQTT] Saved measurement for device {device_id} at {measurement_time} (source: {source})")
         
     except Exception as e:
         logger.error(f"[MQTT] Error saving sensor data: {e!r}")
@@ -175,6 +243,37 @@ async def process_status_message(topic: str, payload: str):
         logger.error(f"[MQTT] Error processing status message: {e!r}")
 
 
+async def process_presence_message(topic: str, payload: str):
+    """
+    Przetwarza wiadomość z topic 'presence/<device_id>'
+    To są wiadomości LWT (Last Will and Testament) informujące o statusie urządzenia.
+    """
+    try:
+        parts = topic.split("/")
+        if len(parts) < 2:
+            return
+        
+        device_id = parts[1]
+        
+        try:
+            data = json.loads(payload)
+            status = data.get("status", "unknown")
+            reason = data.get("reason", "")
+            
+            if status == "online":
+                logger.info(f"[MQTT] Device {device_id} is ONLINE")
+            elif status == "offline":
+                logger.warning(f"[MQTT] Device {device_id} is OFFLINE (reason: {reason})")
+            else:
+                logger.info(f"[MQTT] Device {device_id} presence: {status}")
+                
+        except json.JSONDecodeError:
+            logger.info(f"[MQTT] Device {device_id} presence: {payload}")
+            
+    except Exception as e:
+        logger.error(f"[MQTT] Error processing presence message: {e!r}")
+
+
 async def process_message(topic: str, payload: str):
     """
     Główny router wiadomości MQTT.
@@ -185,6 +284,8 @@ async def process_message(topic: str, payload: str):
         await process_sensor_message(topic, payload)
     elif topic.startswith("status/"):
         await process_status_message(topic, payload)
+    elif topic.startswith("presence/"):
+        await process_presence_message(topic, payload)
     else:
         logger.warning(f"[MQTT] Unknown topic: {topic}")
 
@@ -232,7 +333,9 @@ async def _mqtt_loop():
         # Subscribe to all relevant topics
         await client.subscribe(MQTT_TOPIC_SENSORS)
         await client.subscribe(MQTT_TOPIC_STATUS)
-        logger.info(f"[MQTT] Subscribed to {MQTT_TOPIC_SENSORS} and {MQTT_TOPIC_STATUS}")
+        await client.subscribe(MQTT_TOPIC_PRESENCE)
+        logger.info(f"[MQTT] Connected to {MQTT_HOST}:{MQTT_PORT}")
+        logger.info(f"[MQTT] Subscribed to {MQTT_TOPIC_SENSORS}, {MQTT_TOPIC_STATUS}, {MQTT_TOPIC_PRESENCE}")
 
         try:
             async for message in client.messages:
