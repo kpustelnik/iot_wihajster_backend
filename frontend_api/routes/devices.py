@@ -214,8 +214,6 @@ async def confirm_device_connection(
         current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
         db: AsyncSession = Depends(get_db),
 ):
-#        db: AsyncSession = Depends(get_db),
-):
     ca = CertificateAuthority()
 
     cert = x509.load_pem_x509_certificate(req.cert.encode("utf-8"), default_backend())
