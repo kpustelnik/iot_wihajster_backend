@@ -2,23 +2,92 @@
 
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { measurementsApi } from '@/lib/api';
+import {
+    Box,
+    Card,
+    CardContent,
+    Typography,
+    ToggleButton,
+    ToggleButtonGroup,
+    CircularProgress,
+    Stack,
+    Chip,
+    Grid,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
+    Alert,
+    Snackbar,
+    Divider,
+    Slider,
+    TextField,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    IconButton,
+    Collapse,
+} from '@mui/material';
+import SensorsIcon from '@mui/icons-material/Sensors';
+import BatteryFullIcon from '@mui/icons-material/BatteryFull';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import SignalCellularAltIcon from '@mui/icons-material/SignalCellularAlt';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SettingsIcon from '@mui/icons-material/Settings';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import { measurementsApi, devicesApi } from '@/lib/api';
+import * as controlApi from '@/lib/api/control';
 import type { MeasurementModel, DeviceModel } from '@/lib/api/schemas';
 import { Timescale } from '@/lib/api/schemas';
-import styles from './DeviceDetails.module.css';
 
 interface DeviceDetailsProps {
     device: DeviceModel;
+    onDeviceReleased?: () => void;
 }
 
-export default function DeviceDetails({ device }: DeviceDetailsProps) {
+export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetailsProps) {
     const [measurements, setMeasurements] = useState<MeasurementModel[]>([]);
+    const [latestReading, setLatestReading] = useState<{
+        timestamp: string | null;
+        temperature: number | null;
+        humidity: number | null;
+        pressure: number | null;
+        pm2_5: number | null;
+        pm10_0: number | null;
+        latitude: number | null;
+        longitude: number | null;
+    } | null>(null);
     const [loading, setLoading] = useState(true);
-    const [timescale, setTimescale] = useState<Timescale>(Timescale.DAY);
+    const [timescale, setTimescale] = useState<Timescale>(Timescale.HOUR);
+    const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
+    const [releasing, setReleasing] = useState(false);
+    const [snackbar, setSnackbar] = useState<{open: boolean; message: string; severity: 'success' | 'error'}>({
+        open: false, message: '', severity: 'success'
+    });
+    
+    // Control panel state
+    const [controlExpanded, setControlExpanded] = useState(false);
+    const [ledBrightness, setLedBrightness] = useState(50);
+    const [ledMode, setLedMode] = useState<'off' | 'static' | 'blink' | 'breath' | 'fast_blink'>('static');
+    const [ledColor, setLedColor] = useState({ r: 0, g: 255, b: 0 });
+    const [sensorInterval, setSensorInterval] = useState(60000);
+    const [commandLoading, setCommandLoading] = useState(false);
 
-    useEffect(() => {
-        fetchMeasurements();
-    }, [device.id, timescale]);
+    const fetchLatestReading = async () => {
+        try {
+            const data = await devicesApi.getLatestSensors(device.id);
+            setLatestReading(data);
+        } catch (error) {
+            console.error('Failed to fetch latest reading:', error);
+        }
+    };
 
     const fetchMeasurements = async () => {
         setLoading(true);
@@ -36,6 +105,16 @@ export default function DeviceDetails({ device }: DeviceDetailsProps) {
         }
     };
 
+    useEffect(() => {
+        fetchLatestReading();
+        fetchMeasurements();
+        
+        // Auto-refresh latest reading every 30 seconds
+        const interval = setInterval(fetchLatestReading, 30000);
+        return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [device.id, timescale]);
+
     const formatTime = (timeString: string) => {
         const date = new Date(timeString);
         return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
@@ -52,213 +131,695 @@ export default function DeviceDetails({ device }: DeviceDetailsProps) {
         }));
     };
 
+    const handleTimescaleChange = (_: React.MouseEvent<HTMLElement>, newTimescale: Timescale | null) => {
+        if (newTimescale !== null) {
+            setTimescale(newTimescale);
+        }
+    };
+
+    // MQTT Control functions
+    const showCommandResult = (success: boolean, message: string) => {
+        setSnackbar({
+            open: true,
+            message: success ? `✓ ${message}` : `✗ ${message}`,
+            severity: success ? 'success' : 'error'
+        });
+    };
+
+    const handleReboot = async () => {
+        setCommandLoading(true);
+        try {
+            const result = await controlApi.rebootDevice(device.id);
+            showCommandResult(result.success, 'Komenda restart wysłana');
+        } catch {
+            showCommandResult(false, 'Błąd wysyłania komendy');
+        } finally {
+            setCommandLoading(false);
+        }
+    };
+
+    const handleSetLedBrightness = async () => {
+        setCommandLoading(true);
+        try {
+            const result = await controlApi.setLedBrightness(device.id, ledBrightness);
+            showCommandResult(result.success, `Jasność LED: ${ledBrightness}%`);
+        } catch {
+            showCommandResult(false, 'Błąd ustawiania jasności');
+        } finally {
+            setCommandLoading(false);
+        }
+    };
+
+    const handleSetLedMode = async () => {
+        setCommandLoading(true);
+        try {
+            const result = await controlApi.setLedMode({ device_id: device.id, mode: ledMode });
+            showCommandResult(result.success, `Tryb LED: ${ledMode}`);
+        } catch {
+            showCommandResult(false, 'Błąd ustawiania trybu LED');
+        } finally {
+            setCommandLoading(false);
+        }
+    };
+
+    const handleSetLedColor = async () => {
+        setCommandLoading(true);
+        try {
+            const result = await controlApi.setLedColor({ device_id: device.id, ...ledColor });
+            showCommandResult(result.success, `Kolor LED: RGB(${ledColor.r}, ${ledColor.g}, ${ledColor.b})`);
+        } catch {
+            showCommandResult(false, 'Błąd ustawiania koloru LED');
+        } finally {
+            setCommandLoading(false);
+        }
+    };
+
+    const handleSetInterval = async () => {
+        setCommandLoading(true);
+        try {
+            const result = await controlApi.setSensorInterval({ device_id: device.id, interval_ms: sensorInterval });
+            showCommandResult(result.success, `Interwał pomiarów: ${sensorInterval / 1000}s`);
+        } catch {
+            showCommandResult(false, 'Błąd ustawiania interwału');
+        } finally {
+            setCommandLoading(false);
+        }
+    };
+
+    const handleGetStatus = async () => {
+        setCommandLoading(true);
+        try {
+            const result = await controlApi.getDeviceStatus(device.id);
+            showCommandResult(result.success, 'Żądanie statusu wysłane');
+        } catch {
+            showCommandResult(false, 'Błąd żądania statusu');
+        } finally {
+            setCommandLoading(false);
+        }
+    };
+
+    const handleReleaseDevice = async () => {
+        setReleasing(true);
+        try {
+            await devicesApi.release(device.id);
+            setSnackbar({
+                open: true,
+                message: 'Urządzenie zostało zwolnione. Wykonaj factory reset (przytrzymaj BOOT 10s).',
+                severity: 'success'
+            });
+            setReleaseDialogOpen(false);
+            if (onDeviceReleased) {
+                onDeviceReleased();
+            }
+        } catch (error) {
+            console.error('Failed to release device:', error);
+            setSnackbar({
+                open: true,
+                message: 'Nie udało się zwolnić urządzenia.',
+                severity: 'error'
+            });
+        } finally {
+            setReleasing(false);
+        }
+    };
+
     const chartData = prepareChartData();
 
     if (loading) {
         return (
-            <div className={styles.container}>
-                <div className={styles.loading}>Loading device data...</div>
-            </div>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+                <CircularProgress size={60} />
+            </Box>
         );
     }
 
     return (
-        <div className={styles.container}>
-            {/* Device Info */}
-            <div className={styles.deviceInfo}>
-                <h2 className={styles.title}>📟 Device {device.id}</h2>
-                <div className={styles.infoGrid}>
-                    <div className={styles.infoItem}>
-                        <span className={styles.label}>Battery:</span>
-                        <span className={styles.value}>{device.battery !== null ? `${device.battery}%` : 'N/A'}</span>
-                    </div>
-                    <div className={styles.infoItem}>
-                        <span className={styles.label}>Privacy:</span>
-                        <span className={styles.value}>{device.privacy}</span>
-                    </div>
-                    <div className={styles.infoItem}>
-                        <span className={styles.label}>Status:</span>
-                        <span className={styles.value}>{device.status}</span>
-                    </div>
-                </div>
-            </div>
+        <Box sx={{ p: 3 }}>
+            {/* Device Info Card */}
+            <Card sx={{ mb: 3 }}>
+                <CardContent sx={{ p: 2.5 }}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2} flexWrap="wrap" gap={1}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                            <SensorsIcon color="primary" />
+                            <Typography variant="h5">Urządzenie {device.id}</Typography>
+                        </Stack>
+                        <Button
+                            size="small"
+                            startIcon={<RefreshIcon />}
+                            onClick={fetchMeasurements}
+                        >
+                            Odśwież
+                        </Button>
+                    </Stack>
+                    <Grid container spacing={2}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                            <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1, minHeight: 48, display: 'flex', alignItems: 'center' }}>
+                                <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                                    <BatteryFullIcon color="action" />
+                                    <Typography color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>Bateria:</Typography>
+                                    <Chip 
+                                        label={device.battery !== null ? `${device.battery}%` : 'N/A'}
+                                        color={device.battery && device.battery > 20 ? 'success' : 'error'}
+                                        size="small"
+                                    />
+                                </Stack>
+                            </Box>
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                            <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1, minHeight: 48, display: 'flex', alignItems: 'center' }}>
+                                <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                                    <VisibilityIcon color="action" />
+                                    <Typography color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>Prywatność:</Typography>
+                                    <Chip label={device.privacy} size="small" />
+                                </Stack>
+                            </Box>
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                            <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1, minHeight: 48, display: 'flex', alignItems: 'center' }}>
+                                <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                                    <SignalCellularAltIcon color="action" />
+                                    <Typography color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>Status:</Typography>
+                                    <Chip 
+                                        label={device.status}
+                                        color={device.status === 'ACCEPTED' ? 'success' : 'warning'}
+                                        size="small"
+                                    />
+                                </Stack>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </CardContent>
+            </Card>
+
+            {/* Current Sensor Values Card */}
+            {latestReading && (
+                <Card sx={{ mb: 3 }}>
+                    <CardContent sx={{ p: 2 }}>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+                            <Typography variant="subtitle1" fontWeight={600}>
+                                📊 Aktualne wartości
+                            </Typography>
+                            <IconButton size="small" onClick={fetchLatestReading} title="Odśwież">
+                                <RefreshIcon fontSize="small" />
+                            </IconButton>
+                        </Stack>
+                        <Grid container spacing={2}>
+                            <Grid size={{ xs: 6, sm: 4 }}>
+                                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" display="block" sx={{ mb: 0.5 }}>🌡️ Temperatura</Typography>
+                                    <Typography variant="h5" color="primary" fontWeight={600}>
+                                        {latestReading.temperature?.toFixed(1) ?? '—'}°C
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 4 }}>
+                                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" display="block" sx={{ mb: 0.5 }}>💧 Wilgotność</Typography>
+                                    <Typography variant="h5" color="info.main" fontWeight={600}>
+                                        {latestReading.humidity ?? '—'}%
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 4 }}>
+                                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" display="block" sx={{ mb: 0.5 }}>🔵 Ciśnienie</Typography>
+                                    <Typography variant="h5" color="secondary.main" fontWeight={600}>
+                                        {latestReading.pressure ? (latestReading.pressure / 100).toFixed(0) : '—'} hPa
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 4 }}>
+                                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" display="block" sx={{ mb: 0.5 }}>🟠 PM2.5</Typography>
+                                    <Typography variant="h5" sx={{ color: (latestReading.pm2_5 ?? 0) > 25 ? 'error.main' : 'success.main', fontWeight: 600 }}>
+                                        {latestReading.pm2_5 ?? '—'} µg/m³
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 4 }}>
+                                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" display="block" sx={{ mb: 0.5 }}>🔴 PM10</Typography>
+                                    <Typography variant="h5" sx={{ color: (latestReading.pm10_0 ?? 0) > 50 ? 'error.main' : 'success.main', fontWeight: 600 }}>
+                                        {latestReading.pm10_0 ?? '—'} µg/m³
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 4 }}>
+                                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" display="block" sx={{ mb: 0.5 }}>🕐 Ostatni odczyt</Typography>
+                                    <Typography variant="h6" fontWeight={500}>
+                                        {latestReading.timestamp ? new Date(latestReading.timestamp).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : '—'}
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                        </Grid>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Timescale Selector */}
-            <div className={styles.timescaleSelector}>
-                <label className={styles.timescaleLabel}>Time Range:</label>
-                <div className={styles.timescaleButtons}>
-                    <button
-                        className={`${styles.timescaleButton} ${timescale === Timescale.DAY ? styles.active : ''}`}
-                        onClick={() => setTimescale(Timescale.DAY)}
-                    >
-                        Day
-                    </button>
-                    <button
-                        className={`${styles.timescaleButton} ${timescale === Timescale.WEEK ? styles.active : ''}`}
-                        onClick={() => setTimescale(Timescale.WEEK)}
-                    >
-                        Week
-                    </button>
-                    <button
-                        className={`${styles.timescaleButton} ${timescale === Timescale.MONTH ? styles.active : ''}`}
-                        onClick={() => setTimescale(Timescale.MONTH)}
-                    >
-                        Month
-                    </button>
-                    <button
-                        className={`${styles.timescaleButton} ${timescale === Timescale.YEAR ? styles.active : ''}`}
-                        onClick={() => setTimescale(Timescale.YEAR)}
-                    >
-                        Year
-                    </button>
-                </div>
-            </div>
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap" gap={1}>
+                        <Typography>Zakres czasu:</Typography>
+                        <ToggleButtonGroup
+                            value={timescale}
+                            exclusive
+                            onChange={handleTimescaleChange}
+                            size="small"
+                            sx={{ flexWrap: 'wrap' }}
+                        >
+                            <ToggleButton value={Timescale.LIVE}>5 min</ToggleButton>
+                            <ToggleButton value={Timescale.HOUR}>1h</ToggleButton>
+                            <ToggleButton value={Timescale.HOURS_6}>6h</ToggleButton>
+                            <ToggleButton value={Timescale.DAY}>24h</ToggleButton>
+                            <ToggleButton value={Timescale.WEEK}>Tydzień</ToggleButton>
+                            <ToggleButton value={Timescale.MONTH}>Miesiąc</ToggleButton>
+                            <ToggleButton value={Timescale.YEAR}>Rok</ToggleButton>
+                        </ToggleButtonGroup>
+                    </Stack>
+                </CardContent>
+            </Card>
 
             {/* Charts */}
             {measurements.length === 0 ? (
-                <div className={styles.noData}>No measurement data available</div>
+                <Card>
+                    <CardContent>
+                        <Typography color="text.secondary" align="center">
+                            Brak danych pomiarowych
+                        </Typography>
+                    </CardContent>
+                </Card>
             ) : (
-                <div className={styles.charts}>
-                    {/* Temperature and Humidity Combined Chart with Dual Y-Axes */}
-                    <div className={styles.chartContainer}>
-                        <h3 className={styles.chartTitle}>🌡️💧 Temperature & Humidity</h3>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <LineChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                <XAxis
-                                    dataKey="time"
-                                    tick={{ fontSize: 12 }}
-                                    stroke="#6b7280"
-                                />
-                                {/* Left Y-axis for Temperature */}
-                                <YAxis
-                                    yAxisId="temperature"
-                                    tick={{ fontSize: 12 }}
-                                    stroke="#ef4444"
-                                    label={{ value: '°C', angle: -90, position: 'insideLeft' }}
-                                />
-                                {/* Right Y-axis for Humidity */}
-                                <YAxis
-                                    yAxisId="humidity"
-                                    orientation="right"
-                                    tick={{ fontSize: 12 }}
-                                    stroke="#3b82f6"
-                                    label={{ value: '%', angle: 90, position: 'insideRight' }}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '8px'
-                                    }}
-                                />
-                                <Legend />
-                                <Line
-                                    yAxisId="temperature"
-                                    type="monotone"
-                                    dataKey="temperature"
-                                    stroke="#ef4444"
-                                    strokeWidth={2}
-                                    name="Temperature (°C)"
-                                    dot={false}
-                                    connectNulls
-                                />
-                                <Line
-                                    yAxisId="humidity"
-                                    type="monotone"
-                                    dataKey="humidity"
-                                    stroke="#3b82f6"
-                                    strokeWidth={2}
-                                    name="Humidity (%)"
-                                    dot={false}
-                                    connectNulls
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
+                <Stack spacing={3}>
+                    {/* Temperature and Humidity Combined Chart */}
+                    <Card>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                                🌡️💧 Temperatura i wilgotność
+                            </Typography>
+                            <Box sx={{ height: 250 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                        <XAxis
+                                            dataKey="time"
+                                            tick={{ fontSize: 12 }}
+                                            stroke="#6b7280"
+                                        />
+                                        <YAxis
+                                            yAxisId="temperature"
+                                            tick={{ fontSize: 12 }}
+                                            stroke="#ef4444"
+                                            label={{ value: '°C', angle: -90, position: 'insideLeft' }}
+                                        />
+                                        <YAxis
+                                            yAxisId="humidity"
+                                            orientation="right"
+                                            tick={{ fontSize: 12 }}
+                                            stroke="#3b82f6"
+                                            label={{ value: '%', angle: 90, position: 'insideRight' }}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                border: '1px solid #e5e7eb',
+                                                borderRadius: '8px'
+                                            }}
+                                        />
+                                        <Legend />
+                                        <Line
+                                            yAxisId="temperature"
+                                            type="monotone"
+                                            dataKey="temperature"
+                                            stroke="#ef4444"
+                                            strokeWidth={2}
+                                            name="Temperatura (°C)"
+                                            dot={false}
+                                            connectNulls
+                                        />
+                                        <Line
+                                            yAxisId="humidity"
+                                            type="monotone"
+                                            dataKey="humidity"
+                                            stroke="#3b82f6"
+                                            strokeWidth={2}
+                                            name="Wilgotność (%)"
+                                            dot={false}
+                                            connectNulls
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </Box>
+                        </CardContent>
+                    </Card>
 
                     {/* PM2.5 and PM10 Combined Chart */}
-                    <div className={styles.chartContainer}>
-                        <h3 className={styles.chartTitle}>🌫️ Particulate Matter (PM2.5 & PM10)</h3>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <LineChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                <XAxis
-                                    dataKey="time"
-                                    tick={{ fontSize: 12 }}
-                                    stroke="#6b7280"
-                                />
-                                <YAxis
-                                    tick={{ fontSize: 12 }}
-                                    stroke="#6b7280"
-                                    label={{ value: 'μg/m³', angle: -90, position: 'insideLeft' }}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '8px'
-                                    }}
-                                />
-                                <Legend />
-                                <Line
-                                    type="monotone"
-                                    dataKey="pm25"
-                                    stroke="#f97316"
-                                    strokeWidth={2}
-                                    name="PM2.5"
-                                    dot={false}
-                                    connectNulls
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="pm10"
-                                    stroke="#92400e"
-                                    strokeWidth={2}
-                                    name="PM10"
-                                    dot={false}
-                                    connectNulls
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
+                    <Card>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                                🌫️ Pyły zawieszone (PM2.5 i PM10)
+                            </Typography>
+                            <Box sx={{ height: 250 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                        <XAxis
+                                            dataKey="time"
+                                            tick={{ fontSize: 12 }}
+                                            stroke="#6b7280"
+                                        />
+                                        <YAxis
+                                            tick={{ fontSize: 12 }}
+                                            stroke="#6b7280"
+                                            label={{ value: 'μg/m³', angle: -90, position: 'insideLeft' }}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                border: '1px solid #e5e7eb',
+                                                borderRadius: '8px'
+                                            }}
+                                        />
+                                        <Legend />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="pm25"
+                                            stroke="#f97316"
+                                            strokeWidth={2}
+                                            name="PM2.5"
+                                            dot={false}
+                                            connectNulls
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="pm10"
+                                            stroke="#92400e"
+                                            strokeWidth={2}
+                                            name="PM10"
+                                            dot={false}
+                                            connectNulls
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </Box>
+                        </CardContent>
+                    </Card>
 
                     {/* Pressure Chart */}
-                    <div className={styles.chartContainer}>
-                        <h3 className={styles.chartTitle}>🔽 Pressure</h3>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <LineChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                <XAxis
-                                    dataKey="time"
-                                    tick={{ fontSize: 12 }}
-                                    stroke="#6b7280"
-                                />
-                                <YAxis
-                                    tick={{ fontSize: 12 }}
-                                    stroke="#6b7280"
-                                    label={{ value: 'hPa', angle: -90, position: 'insideLeft' }}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '8px'
-                                    }}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="pressure"
-                                    stroke="#8b5cf6"
-                                    strokeWidth={2}
-                                    dot={false}
-                                    connectNulls
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
+                    <Card>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                                🔽 Ciśnienie
+                            </Typography>
+                            <Box sx={{ height: 250 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                        <XAxis
+                                            dataKey="time"
+                                            tick={{ fontSize: 12 }}
+                                            stroke="#6b7280"
+                                        />
+                                        <YAxis
+                                            tick={{ fontSize: 12 }}
+                                            stroke="#6b7280"
+                                            label={{ value: 'hPa', angle: -90, position: 'insideLeft' }}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                border: '1px solid #e5e7eb',
+                                                borderRadius: '8px'
+                                            }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="pressure"
+                                            stroke="#8b5cf6"
+                                            strokeWidth={2}
+                                            name="Ciśnienie (hPa)"
+                                            dot={false}
+                                            connectNulls
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </Box>
+                        </CardContent>
+                    </Card>
+                </Stack>
             )}
-        </div>
+
+            {/* MQTT Control Panel */}
+            <Card sx={{ mt: 3 }}>
+                <CardContent>
+                    <Stack 
+                        direction="row" 
+                        alignItems="center" 
+                        justifyContent="space-between"
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => setControlExpanded(!controlExpanded)}
+                    >
+                        <Typography variant="h6">
+                            <LightbulbIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                            Sterowanie urządzeniem (MQTT)
+                        </Typography>
+                        <IconButton size="small">
+                            {controlExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        </IconButton>
+                    </Stack>
+                    <Collapse in={controlExpanded}>
+                        <Divider sx={{ my: 2 }} />
+                        <Grid container spacing={3}>
+                            {/* LED Brightness */}
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <Typography gutterBottom>💡 Jasność LED: {ledBrightness}%</Typography>
+                                <Stack direction="row" spacing={2} alignItems="center">
+                                    <Slider
+                                        value={ledBrightness}
+                                        onChange={(_, v) => setLedBrightness(v as number)}
+                                        min={0}
+                                        max={100}
+                                        sx={{ flex: 1 }}
+                                        disabled={commandLoading}
+                                    />
+                                    <Button 
+                                        variant="contained" 
+                                        size="small"
+                                        onClick={handleSetLedBrightness}
+                                        disabled={commandLoading}
+                                    >
+                                        Wyślij
+                                    </Button>
+                                </Stack>
+                            </Grid>
+
+                            {/* LED Mode */}
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <Typography gutterBottom>🎨 Tryb LED</Typography>
+                                <Stack direction="row" spacing={2} alignItems="center">
+                                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                                        <InputLabel>Tryb</InputLabel>
+                                        <Select
+                                            value={ledMode}
+                                            label="Tryb"
+                                            onChange={(e) => setLedMode(e.target.value)}
+                                            disabled={commandLoading}
+                                        >
+                                            <MenuItem value="off">Wyłączone</MenuItem>
+                                            <MenuItem value="solid">Stały</MenuItem>
+                                            <MenuItem value="blink">Miganie</MenuItem>
+                                            <MenuItem value="breath">Oddech</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <Button 
+                                        variant="contained" 
+                                        size="small"
+                                        onClick={handleSetLedMode}
+                                        disabled={commandLoading}
+                                    >
+                                        Wyślij
+                                    </Button>
+                                </Stack>
+                            </Grid>
+
+                            {/* LED Color */}
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <Typography gutterBottom>🌈 Kolor LED (RGB)</Typography>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <TextField
+                                        label="R"
+                                        type="number"
+                                        size="small"
+                                        value={ledColor.r}
+                                        onChange={(e) => setLedColor({ ...ledColor, r: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) })}
+                                        slotProps={{ htmlInput: { min: 0, max: 255 } }}
+                                        sx={{ width: 70 }}
+                                        disabled={commandLoading}
+                                    />
+                                    <TextField
+                                        label="G"
+                                        type="number"
+                                        size="small"
+                                        value={ledColor.g}
+                                        onChange={(e) => setLedColor({ ...ledColor, g: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) })}
+                                        slotProps={{ htmlInput: { min: 0, max: 255 } }}
+                                        sx={{ width: 70 }}
+                                        disabled={commandLoading}
+                                    />
+                                    <TextField
+                                        label="B"
+                                        type="number"
+                                        size="small"
+                                        value={ledColor.b}
+                                        onChange={(e) => setLedColor({ ...ledColor, b: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) })}
+                                        slotProps={{ htmlInput: { min: 0, max: 255 } }}
+                                        sx={{ width: 70 }}
+                                        disabled={commandLoading}
+                                    />
+                                    <Box 
+                                        sx={{ 
+                                            width: 32, 
+                                            height: 32, 
+                                            borderRadius: 1, 
+                                            bgcolor: `rgb(${ledColor.r}, ${ledColor.g}, ${ledColor.b})`,
+                                            border: '1px solid',
+                                            borderColor: 'divider'
+                                        }} 
+                                    />
+                                    <Button 
+                                        variant="contained" 
+                                        size="small"
+                                        onClick={handleSetLedColor}
+                                        disabled={commandLoading}
+                                    >
+                                        Wyślij
+                                    </Button>
+                                </Stack>
+                            </Grid>
+
+                            {/* Sensor Interval */}
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <Typography gutterBottom>⏱️ Interwał pomiarów: {sensorInterval / 1000}s</Typography>
+                                <Stack direction="row" spacing={2} alignItems="center">
+                                    <Slider
+                                        value={sensorInterval}
+                                        onChange={(_, v) => setSensorInterval(v as number)}
+                                        min={1000}
+                                        max={60000}
+                                        step={1000}
+                                        sx={{ flex: 1 }}
+                                        disabled={commandLoading}
+                                    />
+                                    <Button 
+                                        variant="contained" 
+                                        size="small"
+                                        onClick={handleSetInterval}
+                                        disabled={commandLoading}
+                                    >
+                                        Wyślij
+                                    </Button>
+                                </Stack>
+                            </Grid>
+
+                            {/* Action Buttons */}
+                            <Grid size={{ xs: 12 }}>
+                                <Divider sx={{ my: 1 }} />
+                                <Stack direction="row" spacing={2} flexWrap="wrap">
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<RefreshIcon />}
+                                        onClick={handleGetStatus}
+                                        disabled={commandLoading}
+                                    >
+                                        Pobierz status
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        color="warning"
+                                        startIcon={<RestartAltIcon />}
+                                        onClick={handleReboot}
+                                        disabled={commandLoading}
+                                    >
+                                        Restart urządzenia
+                                    </Button>
+                                </Stack>
+                            </Grid>
+                        </Grid>
+                        {commandLoading && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                                <CircularProgress size={24} />
+                            </Box>
+                        )}
+                    </Collapse>
+                </CardContent>
+            </Card>
+
+            {/* Device Management Card */}
+            <Card sx={{ mt: 3 }}>
+                <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                        <SettingsIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                        Zarządzanie urządzeniem
+                    </Typography>
+                    <Divider sx={{ my: 2 }} />
+                    <Stack direction="row" spacing={2} flexWrap="wrap">
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => setReleaseDialogOpen(true)}
+                        >
+                            Zwolnij urządzenie
+                        </Button>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                        Po zwolnieniu urządzenia wykonaj na nim factory reset (przytrzymaj przycisk BOOT przez 10 sekund).
+                    </Typography>
+                </CardContent>
+            </Card>
+
+            {/* Release Confirmation Dialog */}
+            <Dialog open={releaseDialogOpen} onClose={() => setReleaseDialogOpen(false)}>
+                <DialogTitle>Zwolnij urządzenie</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Czy na pewno chcesz zwolnić urządzenie {device.id}?
+                        <br /><br />
+                        Po zwolnieniu urządzenie nie będzie już przypisane do Twojego konta.
+                        Aby ponownie je przypisać, musisz wykonać factory reset na urządzeniu
+                        (przytrzymaj przycisk BOOT przez 10 sekund) i ponownie połączyć przez Bluetooth.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setReleaseDialogOpen(false)} disabled={releasing}>
+                        Anuluj
+                    </Button>
+                    <Button
+                        onClick={handleReleaseDevice}
+                        color="error"
+                        variant="contained"
+                        disabled={releasing}
+                    >
+                        {releasing ? <CircularProgress size={24} /> : 'Zwolnij'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Snackbar for notifications */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+            >
+                <Alert
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+        </Box>
     );
 }
