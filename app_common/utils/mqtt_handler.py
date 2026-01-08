@@ -47,8 +47,8 @@ def create_tls_context():
         # AWS IoT Core - use Amazon Root CA and mqtt_server certificate
         context.load_verify_locations(AWS_ROOT_CA_PATH)
         context.load_cert_chain(
-            certfile="/certs/servers/mqtt_server.crt",
-            keyfile="/certs/servers/mqtt_server.key"
+            certfile="/certs/mqtt_server.crt",
+            keyfile="/certs/mqtt_server.key"
         )
         context.check_hostname = True
         context.verify_mode = ssl.CERT_REQUIRED
