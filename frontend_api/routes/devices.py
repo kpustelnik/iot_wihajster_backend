@@ -89,6 +89,25 @@ async def get_devices(
     return await device_repo.get_devices(db, current_user, offset, limit)
 
 
+@router.get(
+    "/owned",
+    dependencies=[],
+    tags=[],
+    response_model=LimitedResponse[DeviceModel],
+    status_code=status.HTTP_200_OK,
+    summary="Get devices directly owned by user",
+    response_description="Devices where user_id matches current user",
+)
+async def get_owned_devices(
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=0, le=500),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN]))
+):
+    """Get devices directly assigned to user (bound via BLE handshake)"""
+    return await device_repo.get_owned_devices(db, current_user, offset, limit)
+
+
 challenges = {}
 @router.post(
     "/connect",
@@ -326,15 +345,34 @@ async def confirm_device_connection(
     result = await db.execute(select(Device).where(Device.id == device_id))
     device = result.scalar_one_or_none()
     
-    if device is not None and (binding_status == 1 or owner_user_id == current_user.id):
-        # Device confirmed binding - update database to match
-        stmt = update(Device).where(Device.id == device_id).values(
-            user_id=current_user.id,
-            status=SettingsStatus.ACCEPTED
-        )
-        await db.execute(stmt)
-        await db.commit()
-        print(f"Device {device_id} bound to user {current_user.id} in database")
+    if binding_status == 1 or owner_user_id == current_user.id:
+        if device is not None:
+            # Device exists - update ownership
+            stmt = update(Device).where(Device.id == device_id).values(
+                user_id=current_user.id,
+                status=SettingsStatus.ACCEPTED
+            )
+            await db.execute(stmt)
+            await db.commit()
+            print(f"Device {device_id} bound to user {current_user.id} in database (updated)")
+        else:
+            # Device doesn't exist in database - create it with correct ID
+            # This can happen if device was provisioned but DB was reset
+            from sqlalchemy import text
+            stmt = text("""
+                INSERT INTO devices (id, user_id, status, day_collection_interval, night_collection_interval, day_start, day_end, privacy, battery)
+                VALUES (:id, :user_id, :status, 60, 120, '06:00:00', '22:00:00', 0, 0)
+                ON CONFLICT (id) DO UPDATE SET user_id = :user_id, status = :status
+            """)
+            await db.execute(stmt, {
+                'id': device_id,
+                'user_id': current_user.id,
+                'status': SettingsStatus.ACCEPTED.value
+            })
+            # Also update the sequence to avoid future conflicts
+            await db.execute(text("SELECT setval('devices_id_seq', GREATEST((SELECT MAX(id) FROM devices), :id))"), {'id': device_id})
+            await db.commit()
+            print(f"Device {device_id} created and bound to user {current_user.id} in database (new)")
     
     return {
         'pin': pin,

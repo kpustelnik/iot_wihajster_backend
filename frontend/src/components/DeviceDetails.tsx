@@ -38,7 +38,7 @@ export default function DeviceDetails({ device }: DeviceDetailsProps) {
 
     const formatTime = (timeString: string) => {
         const date = new Date(timeString);
-        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
     };
 
     const prepareChartData = () => {

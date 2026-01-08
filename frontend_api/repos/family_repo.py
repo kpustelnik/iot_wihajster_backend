@@ -52,6 +52,7 @@ async def create_family(
         db_family = Family(**family.model_dump(), user_id=current_user.id)
         db.add(db_family)
         await db.commit()
+        await db.refresh(db_family)
         return db_family
     except IntegrityError as e:
         await db.rollback()
