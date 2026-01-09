@@ -48,6 +48,7 @@ import {
     setSensorInterval,
     rebootDevice,
     getDeviceStatus,
+    setBmp280Settings,
 } from '@/lib/api/control';
 import { devicesApi } from '@/lib/api/devices';
 import { checkForUpdates, deployFirmware } from '@/lib/api/firmware';
@@ -126,6 +127,11 @@ export default function Dashboard({ deviceId }: DashboardProps) {
     
     // Sensor interval
     const [sensorInterval, setSensorIntervalState] = useState(30000);
+    
+    // BMP280 settings
+    const [bmp280TempOsrs, setBmp280TempOsrs] = useState(2);  // x2 oversampling
+    const [bmp280PressOsrs, setBmp280PressOsrs] = useState(5);  // x16 oversampling
+    const [bmp280Filter, setBmp280Filter] = useState(2);  // filter coefficient 4
     
     // Messages
     const [message, setMessage] = useState<{type: 'success' | 'error' | 'warning', text: string} | null>(null);
@@ -213,6 +219,17 @@ export default function Dashboard({ deviceId }: DashboardProps) {
             showMessage('success', `Interwał pomiarów: ${sensorInterval / 1000}s`);
         } catch {
             showMessage('error', 'Nie udało się ustawić interwału');
+        }
+    };
+
+    const handleSetBmp280Settings = async () => {
+        try {
+            // Pack settings: bits 0-2=filter, 3-5=pressure_osrs, 6-8=temp_osrs
+            const settings = (bmp280Filter & 0x7) | ((bmp280PressOsrs & 0x7) << 3) | ((bmp280TempOsrs & 0x7) << 6);
+            await setBmp280Settings({ device_id: deviceId, settings });
+            showMessage('success', 'Ustawienia BMP280 zapisane');
+        } catch {
+            showMessage('error', 'Nie udało się ustawić BMP280');
         }
     };
 
@@ -485,6 +502,78 @@ export default function Dashboard({ deviceId }: DashboardProps) {
                                     Zapisz
                                 </Button>
                             </Stack>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                {/* BMP280 Settings Card */}
+                <Grid size={{ xs: 12, md: 6 }}>
+                    <Card>
+                        <CardContent>
+                            <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                                <ThermostatIcon color="primary" />
+                                <Typography variant="h6">Czujnik BMP280</Typography>
+                            </Stack>
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Temperatura</InputLabel>
+                                        <Select
+                                            value={bmp280TempOsrs}
+                                            label="Temperatura"
+                                            onChange={(e) => setBmp280TempOsrs(e.target.value as number)}
+                                        >
+                                            <MenuItem value={0}>Wyłączony</MenuItem>
+                                            <MenuItem value={1}>x1</MenuItem>
+                                            <MenuItem value={2}>x2</MenuItem>
+                                            <MenuItem value={3}>x4</MenuItem>
+                                            <MenuItem value={4}>x8</MenuItem>
+                                            <MenuItem value={5}>x16</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Ciśnienie</InputLabel>
+                                        <Select
+                                            value={bmp280PressOsrs}
+                                            label="Ciśnienie"
+                                            onChange={(e) => setBmp280PressOsrs(e.target.value as number)}
+                                        >
+                                            <MenuItem value={0}>Wyłączony</MenuItem>
+                                            <MenuItem value={1}>x1</MenuItem>
+                                            <MenuItem value={2}>x2</MenuItem>
+                                            <MenuItem value={3}>x4</MenuItem>
+                                            <MenuItem value={4}>x8</MenuItem>
+                                            <MenuItem value={5}>x16</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Filtr IIR</InputLabel>
+                                        <Select
+                                            value={bmp280Filter}
+                                            label="Filtr IIR"
+                                            onChange={(e) => setBmp280Filter(e.target.value as number)}
+                                        >
+                                            <MenuItem value={0}>Wyłączony</MenuItem>
+                                            <MenuItem value={1}>2</MenuItem>
+                                            <MenuItem value={2}>4</MenuItem>
+                                            <MenuItem value={3}>8</MenuItem>
+                                            <MenuItem value={4}>16</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                            </Grid>
+                            <Button 
+                                variant="contained" 
+                                onClick={handleSetBmp280Settings}
+                                sx={{ mt: 2 }}
+                                fullWidth
+                            >
+                                Zapisz ustawienia BMP280
+                            </Button>
                         </CardContent>
                     </Card>
                 </Grid>

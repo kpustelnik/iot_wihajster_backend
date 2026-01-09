@@ -61,8 +61,22 @@ export default function LTEGPSDebugModal({ open, onClose, server }: {
                 await bluetoothQueueContext.enqueue(() => lteGpsDebugCharacteristic.writeValue(new TextEncoder().encode(chunk)));
               }
               
-              const lengthData = await bluetoothQueueContext.enqueue(() => lteGpsDebugCharacteristic.readValue())
+              const lengthData = await bluetoothQueueContext.enqueue(() => lteGpsDebugCharacteristic.readValue());
+              
+              // Check if we received enough bytes for the length
+              if (lengthData.byteLength < 4) {
+                setOutput('Error: Invalid response from device (not enough data)');
+                setIsExecuting(false);
+                return;
+              }
+              
               const bytes = lengthData.getUint32(0, true);
+              
+              if (bytes === 0) {
+                setOutput('(empty response)');
+                setIsExecuting(false);
+                return;
+              }
 
               let receivedData = '';
               while (receivedData.length < bytes) {

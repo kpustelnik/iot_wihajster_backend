@@ -79,6 +79,12 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
     const [ledColor, setLedColor] = useState({ r: 0, g: 255, b: 0 });
     const [sensorInterval, setSensorInterval] = useState(60000);
     const [commandLoading, setCommandLoading] = useState(false);
+    
+    // BMP280 settings (format: bits 0-2=press, 3-5=temp, 6-8=filter, 9-11=standby)
+    const [bmp280PressOsrs, setBmp280PressOsrs] = useState(5);  // x16 oversampling
+    const [bmp280TempOsrs, setBmp280TempOsrs] = useState(2);  // x2 oversampling
+    const [bmp280Filter, setBmp280Filter] = useState(2);  // filter coefficient 4
+    const [bmp280Standby, setBmp280Standby] = useState(0);  // 0.5ms standby
 
     const fetchLatestReading = async () => {
         try {
@@ -189,6 +195,24 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
             showCommandResult(result.success, `Kolor LED: RGB(${ledColor.r}, ${ledColor.g}, ${ledColor.b})`);
         } catch {
             showCommandResult(false, 'Błąd ustawiania koloru LED');
+        } finally {
+            setCommandLoading(false);
+        }
+    };
+
+    const handleSetBmp280Settings = async () => {
+        setCommandLoading(true);
+        try {
+            // Pack settings: bits 0-2=press, 3-5=temp, 6-8=filter, 9-11=standby
+            const settings = 
+                (bmp280PressOsrs & 0x7) | 
+                ((bmp280TempOsrs & 0x7) << 3) | 
+                ((bmp280Filter & 0x7) << 6) | 
+                ((bmp280Standby & 0x7) << 9);
+            const result = await controlApi.setBmp280Settings({ device_id: device.id, settings });
+            showCommandResult(result.success, 'Ustawienia BMP280 zapisane');
+        } catch {
+            showCommandResult(false, 'Błąd ustawiania BMP280');
         } finally {
             setCommandLoading(false);
         }
@@ -718,6 +742,87 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                         disabled={commandLoading}
                                     >
                                         Wyślij
+                                    </Button>
+                                </Stack>
+                            </Grid>
+
+                            {/* BMP280 Settings */}
+                            <Grid size={{ xs: 12 }}>
+                                <Divider sx={{ my: 1 }} />
+                                <Typography variant="subtitle2" gutterBottom>🌡️ Ustawienia BMP280</Typography>
+                                <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" sx={{ mb: 1 }}>
+                                    <FormControl size="small" sx={{ minWidth: 100 }}>
+                                        <InputLabel>Temp.</InputLabel>
+                                        <Select
+                                            value={bmp280TempOsrs}
+                                            label="Temp."
+                                            onChange={(e) => setBmp280TempOsrs(e.target.value as number)}
+                                            disabled={commandLoading}
+                                        >
+                                            <MenuItem value={0}>Wył.</MenuItem>
+                                            <MenuItem value={1}>x1</MenuItem>
+                                            <MenuItem value={2}>x2</MenuItem>
+                                            <MenuItem value={3}>x4</MenuItem>
+                                            <MenuItem value={4}>x8</MenuItem>
+                                            <MenuItem value={5}>x16</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <FormControl size="small" sx={{ minWidth: 100 }}>
+                                        <InputLabel>Ciśn.</InputLabel>
+                                        <Select
+                                            value={bmp280PressOsrs}
+                                            label="Ciśn."
+                                            onChange={(e) => setBmp280PressOsrs(e.target.value as number)}
+                                            disabled={commandLoading}
+                                        >
+                                            <MenuItem value={0}>Wył.</MenuItem>
+                                            <MenuItem value={1}>x1</MenuItem>
+                                            <MenuItem value={2}>x2</MenuItem>
+                                            <MenuItem value={3}>x4</MenuItem>
+                                            <MenuItem value={4}>x8</MenuItem>
+                                            <MenuItem value={5}>x16</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <FormControl size="small" sx={{ minWidth: 90 }}>
+                                        <InputLabel>Filtr</InputLabel>
+                                        <Select
+                                            value={bmp280Filter}
+                                            label="Filtr"
+                                            onChange={(e) => setBmp280Filter(e.target.value as number)}
+                                            disabled={commandLoading}
+                                        >
+                                            <MenuItem value={0}>Wył.</MenuItem>
+                                            <MenuItem value={1}>2</MenuItem>
+                                            <MenuItem value={2}>4</MenuItem>
+                                            <MenuItem value={3}>8</MenuItem>
+                                            <MenuItem value={4}>16</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <FormControl size="small" sx={{ minWidth: 110 }}>
+                                        <InputLabel>Standby</InputLabel>
+                                        <Select
+                                            value={bmp280Standby}
+                                            label="Standby"
+                                            onChange={(e) => setBmp280Standby(e.target.value as number)}
+                                            disabled={commandLoading}
+                                        >
+                                            <MenuItem value={0}>0.5 ms</MenuItem>
+                                            <MenuItem value={1}>62.5 ms</MenuItem>
+                                            <MenuItem value={2}>125 ms</MenuItem>
+                                            <MenuItem value={3}>250 ms</MenuItem>
+                                            <MenuItem value={4}>500 ms</MenuItem>
+                                            <MenuItem value={5}>1000 ms</MenuItem>
+                                            <MenuItem value={6}>2000 ms</MenuItem>
+                                            <MenuItem value={7}>4000 ms</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <Button 
+                                        variant="contained" 
+                                        size="small"
+                                        onClick={handleSetBmp280Settings}
+                                        disabled={commandLoading}
+                                    >
+                                        Zapisz
                                     </Button>
                                 </Stack>
                             </Grid>

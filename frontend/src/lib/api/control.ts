@@ -31,12 +31,9 @@ export interface OtaUpdateParams {
     url: string;
 }
 
-export interface AlarmThresholds {
+export interface Bmp280SettingsParams {
     device_id: number;
-    pm25_high?: number;
-    pm10_high?: number;
-    temp_low?: number;
-    temp_high?: number;
+    settings: number;  // uint16: bits 0-2=filter, 3-5=pressure_osrs, 6-8=temp_osrs
 }
 
 // LED Control
@@ -77,9 +74,9 @@ export async function getOtaStatus(device_id: number): Promise<CommandResponse> 
     return response.data;
 }
 
-// Alarm Thresholds
-export async function setAlarmThresholds(params: AlarmThresholds): Promise<CommandResponse> {
-    const response = await client.post('/control/alarms/thresholds', params);
+// BMP280 Sensor Settings
+export async function setBmp280Settings(params: Bmp280SettingsParams): Promise<CommandResponse> {
+    const response = await client.post('/control/sensor/bmp280', params);
     return response.data;
 }
 
