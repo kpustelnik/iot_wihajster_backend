@@ -52,10 +52,61 @@ export const devicesApi = {
     },
 
     /**
-     * List all devices
+     * List all devices (owned + via families)
      */
     list: async () => {
         const response = await axios.get<LimitedResponse<DeviceModel>>(API_ENDPOINTS.devices.list);
+        return response.data;
+    },
+
+    /**
+     * List only directly owned devices (bound via BLE handshake)
+     */
+    listOwned: async () => {
+        const response = await axios.get<LimitedResponse<DeviceModel>>('/devices/owned');
+        return response.data;
+    },
+
+    /**
+     * Get device details
+     */
+    get: async (deviceId: number) => {
+        const response = await axios.get<DeviceModel>(`/devices/${deviceId}`);
+        return response.data;
+    },
+
+    /**
+     * Claim a device (register to account)
+     * Note: Device must be released first and factory reset performed
+     */
+    claim: async (deviceId: number) => {
+        const response = await axios.post<DeviceModel>('/devices/claim', { device_id: deviceId });
+        return response.data;
+    },
+
+    /**
+     * Release device ownership
+     * After releasing, perform factory reset on device (hold BOOT 10s)
+     */
+    release: async (deviceId: number) => {
+        const response = await axios.post<{message: string; device_id: number}>('/devices/release', { device_id: deviceId });
+        return response.data;
+    },
+
+    /**
+     * Get latest sensor readings for a device
+     */
+    getLatestSensors: async (deviceId: number) => {
+        const response = await axios.get<{
+            timestamp: string | null;
+            temperature: number | null;
+            humidity: number | null;
+            pressure: number | null;
+            pm2_5: number | null;
+            pm10_0: number | null;
+            latitude: number | null;
+            longitude: number | null;
+        }>(`/devices/${deviceId}/sensors/latest`);
         return response.data;
     },
 };

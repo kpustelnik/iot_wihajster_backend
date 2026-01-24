@@ -35,7 +35,7 @@ class DatabaseSessionManager:
 
         from . import models  # Make sure all models are loaded
         async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)  # TODO remove outside of debug
+            # Only create tables if they don't exist - don't drop!
             await conn.run_sync(Base.metadata.create_all)
 
         self.session_maker = async_sessionmaker(

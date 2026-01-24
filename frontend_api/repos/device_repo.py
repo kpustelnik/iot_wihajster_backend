@@ -1,4 +1,4 @@
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 
 from sqlalchemy import select, distinct, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,15 +24,46 @@ async def create_device(
         raise ValueError(f"Database error: {str(e)}")
 
 
+async def get_owned_devices(
+        db: AsyncSession,
+        user: User,
+        offset: int,
+        limit: int
+):
+    """Get devices directly owned by the user (via user_id field)"""
+    count_query = (
+        select(func.count(Device.id))
+        .where(Device.user_id == user.id)
+    )
+
+    query = (
+        select(Device)
+        .where(Device.user_id == user.id)
+        .order_by(Device.id)
+        .offset(offset)
+        .limit(limit)
+    )
+
+    count = await db.scalar(count_query)
+    devices = (await db.scalars(query)).all()
+
+    return LimitedResponse(
+        offset=offset,
+        limit=limit,
+        total_count=count,
+        content=[*devices]
+    )
+
+
 async def get_devices(
         db: AsyncSession,
         user: User,
         offset: int,
         limit: int
 ):
-    count_query = (
-        select(func.count(distinct(Device.id)))
-        .join(FamilyDevice, Device.id == FamilyDevice.device_id)
+    # Subquery for devices accessible through family membership
+    family_devices_subquery = (
+        select(FamilyDevice.device_id)
         .join(Family, Family.id == FamilyDevice.family_id)
         .join(FamilyMember, FamilyMember.family_id == Family.id)
         .where(or_(
@@ -40,15 +71,21 @@ async def get_devices(
             Family.user_id == user.id
         ))
     )
+    
+    # Main query: devices owned directly OR accessible through family
+    count_query = (
+        select(func.count(distinct(Device.id)))
+        .where(or_(
+            Device.user_id == user.id,  # Directly owned by user
+            Device.id.in_(family_devices_subquery)  # In user's family
+        ))
+    )
 
     query = (
         select(Device).distinct(Device.id)
-        .join(FamilyDevice, Device.id == FamilyDevice.device_id)
-        .join(Family, Family.id == FamilyDevice.family_id)
-        .join(FamilyMember, FamilyMember.family_id == Family.id)
         .where(or_(
-            FamilyMember.user_id == user.id,
-            Family.user_id == user.id
+            Device.user_id == user.id,  # Directly owned by user
+            Device.id.in_(family_devices_subquery)  # In user's family
         ))
         .order_by(Device.id)
         .offset(offset)

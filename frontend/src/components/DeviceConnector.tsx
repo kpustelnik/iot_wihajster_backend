@@ -1,37 +1,79 @@
 "use client";
 
-import { useState, useContext } from "react";
+import React, { useState, useContext } from "react";
 import { Button, Typography, Stepper, Step, StepLabel, StepContent, CircularProgress, Alert } from "@mui/material";
 
 import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 import BLEServiceEnum, { AdvertisedServices, OptionalServices } from "@/lib/BLEServiceEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
+import { useSnackbar } from "@/contexts/SnackbarContext";
 
 import axios from '@/lib/AxiosClient';
 
-export default function DeviceConnector({ server, setServer, setSettingsOpen }: {
-  server: BluetoothRemoteGATTServer | null,
-  setServer: (server: BluetoothRemoteGATTServer | null) => void,
-  setSettingsOpen: (areSettingsOpen: boolean) => void
-}) {
+interface DeviceConnectorProps {
+  // Controlled mode props (optional)
+  server?: BluetoothRemoteGATTServer | null;
+  setServer?: (server: BluetoothRemoteGATTServer | null) => void;
+  setSettingsOpen?: (areSettingsOpen: boolean) => void;
+  // Standalone mode props (optional)
+  onDeviceConnected?: () => void;
+}
+
+export default function DeviceConnector({ 
+  server: externalServer, 
+  setServer: externalSetServer, 
+  setSettingsOpen: externalSetSettingsOpen,
+  onDeviceConnected 
+}: DeviceConnectorProps) {
   const bluetoothQueueContext = useContext(BluetoothQueueContext);
+  const { showError, showWarning, showSuccess, showInfo } = useSnackbar();
   const [step, setStep] = useState<number>(0);
   const [pin, setPin] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [bindingStatus, setBindingStatus] = useState<number | null>(null); // 0=ok, 1=newly bound, 2=rejected
+  
+  // Internal state for standalone mode
+  const [internalServer, setInternalServer] = useState<BluetoothRemoteGATTServer | null>(null);
+  const [, setInternalSettingsOpen] = useState<boolean>(false);
+  
+  // Use external state if provided, otherwise use internal state
+  const server = externalServer !== undefined ? externalServer : internalServer;
+  const setServer = externalSetServer !== undefined ? externalSetServer : setInternalServer;
+  const setSettingsOpen = externalSetSettingsOpen !== undefined ? externalSetSettingsOpen : setInternalSettingsOpen;
 
-  // TODO: Add alert (error handling)
+  // Check if server is already connected when component mounts (e.g. after tab switch)
+  React.useEffect(() => {
+    if (server && server.connected && step === 0) {
+      // Server is connected but step is 0 - this means we remounted after a tab switch
+      setStep(6);
+    }
+  }, [server, step]);
+
   const connectBluetooth = async () => {
-    if ('bluetooth' in navigator) {
-      if (isConnecting) return;
+    if (!('bluetooth' in navigator)) {
+      showError('Web Bluetooth is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
 
-      setIsConnecting(true);
+    if (isConnecting) return;
+
+    setIsConnecting(true);
+    
+    try {
       const device: BluetoothDevice | null = await navigator.bluetooth.requestDevice({
         filters: [{ services: AdvertisedServices }],
         optionalServices: OptionalServices
-      }).catch(() => {
-        // TODO: Add alert
+      }).catch((err) => {
+        if (err.name === 'NotFoundError') {
+          showWarning('No device selected. Please try again.');
+        } else if (err.name === 'SecurityError') {
+          showError('Bluetooth access denied. Please allow Bluetooth access.');
+        } else {
+          showError(`Bluetooth error: ${err.message}`);
+        }
         return null;
       });
+
       if (!device || !device.gatt) {
         setIsConnecting(false);
         return;
@@ -41,6 +83,7 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
         setServer(null);
         setStep(0);
         setSettingsOpen(false);
+        showWarning('Device disconnected');
       });
 
       const deviceServer: BluetoothRemoteGATTServer = await device.gatt.connect();
@@ -56,11 +99,15 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
       const isEncrypted = encryptedValue.getUint8(0) === 1;
       if (isEncrypted) {
         setStep(6);
+        showSuccess('Connection already secured!');
+        if (onDeviceConnected) {
+          onDeviceConnected();
+        }
         return;
       }
 
       const deviceCertificateCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_CERTIFICATE));
-      await bluetoothQueueContext.enqueue(() => deviceCertificateCharacteristic.writeValue(new Uint8Array([0x01]))); // Reset the certificate length
+      await bluetoothQueueContext.enqueue(() => deviceCertificateCharacteristic.writeValue(new Uint8Array([0x01])));
       const decoder = new TextDecoder('utf-8');
 
       let certificateString = '';
@@ -84,7 +131,6 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
           await bluetoothQueueContext.enqueue(() => deviceProxiedCommunicationCharacteristic.writeValue(new TextEncoder().encode(chunk)));
         }
         bluetoothQueueContext.enqueue(() => deviceProxiedCommunicationCharacteristic.readValue()).then(async value => {
-          // value is a number of bytes
           const bytes = value.getUint32(0, true);
 
           let receivedData = '';
@@ -101,6 +147,14 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
           setStep(4);
           await axios.post('/devices/confirm', receivedDataParsed).then(async (response) => {
             setPin(response.data.pin.toString());
+            
+            // Handle binding status from server response
+            const bindStatus = response.data.binding_status;
+            setBindingStatus(bindStatus);
+            if (bindStatus === 1) {
+              showInfo('Device has been claimed and bound to your account!');
+            }
+            
             setStep(5);
 
             while (true) {
@@ -108,12 +162,36 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
               const isEncrypted = encryptedValue.getUint8(0) === 1;
               if (isEncrypted) {
                 setStep(6);
+                showSuccess('Connection secured successfully!');
+                // Notify parent that device was connected/claimed
+                if (onDeviceConnected) {
+                  onDeviceConnected();
+                }
                 break;
               }
             }
-          })
+          }).catch((err) => {
+            showError(`Server confirmation failed: ${err.response?.data?.detail || err.message}`);
+            setStep(0);
+            setServer(null);
+          });
+        }).catch((err) => {
+          showError(`Device communication failed: ${err.message}`);
+          setStep(0);
+          setServer(null);
         });
-      })
+      }).catch((err) => {
+        showError(`Server connection failed: ${err.response?.data?.detail || err.message}`);
+        setStep(0);
+        setServer(null);
+      });
+
+    } catch (err: unknown) {
+      const error = err as Error;
+      showError(`Connection failed: ${error.message}`);
+      setIsConnecting(false);
+      setStep(0);
+      setServer(null);
     }
   }
 
@@ -172,6 +250,16 @@ export default function DeviceConnector({ server, setServer, setSettingsOpen }: 
       label: 'Connection secured',
       description: <>
         <Typography>The connection with the device is now secured and encrypted. Proceed to device management.</Typography>
+        {bindingStatus === 1 && (
+          <Alert severity="success" sx={{ mt: 1 }}>
+            🎉 Device has been claimed and bound to your account!
+          </Alert>
+        )}
+        {bindingStatus === 0 && (
+          <Alert severity="info" sx={{ mt: 1 }}>
+            Device was already bound to your account.
+          </Alert>
+        )}
         <Button variant="contained" sx={{ mt: 1 }} onClick={() => setSettingsOpen(true)}>Manage the device</Button>
       </>,
       optional: null

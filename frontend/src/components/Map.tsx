@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Box, CircularProgress, Typography } from '@mui/material';
 import { useTheme } from '@/contexts/ThemeContext';
-import styles from './Map.module.css';
 
 // Fix for default marker icons in React-Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: string })._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
     iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -41,7 +41,7 @@ interface MapProps {
 export default function Map({ isSidebarVisible, isLeftSidebarVisible }: MapProps) {
     const { theme } = useTheme();
     const [location, setLocation] = useState<[number, number]>(DEFAULT_LOCATION);
-    const [locationName, setLocationName] = useState<string>('Krakow, Poland');
+    const [locationName, setLocationName] = useState<string>('Kraków, Polska');
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -51,7 +51,7 @@ export default function Map({ isSidebarVisible, isLeftSidebarVisible }: MapProps
                 (position) => {
                     const { latitude, longitude } = position.coords;
                     setLocation([latitude, longitude]);
-                    setLocationName('Your Location');
+                    setLocationName('Twoja lokalizacja');
                     setIsLoading(false);
                 },
                 (error) => {
@@ -73,9 +73,19 @@ export default function Map({ isSidebarVisible, isLeftSidebarVisible }: MapProps
 
     if (isLoading) {
         return (
-            <div className={styles.loadingContainer}>
-                <div className={styles.loader}>Loading map...</div>
-            </div>
+            <Box 
+                sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    height: '100vh',
+                    gap: 2
+                }}
+            >
+                <CircularProgress size={48} />
+                <Typography color="text.secondary">Ładowanie mapy...</Typography>
+            </Box>
         );
     }
 
@@ -88,7 +98,7 @@ export default function Map({ isSidebarVisible, isLeftSidebarVisible }: MapProps
     };
 
     return (
-        <div className={styles.mapContainer}>
+        <Box sx={{ position: 'relative', width: '100%', height: '100vh' }}>
             <style jsx global>{`
                 .leaflet-top.leaflet-left {
                     left: ${getZoomControlOffset()} !important;
@@ -98,7 +108,7 @@ export default function Map({ isSidebarVisible, isLeftSidebarVisible }: MapProps
             <MapContainer
                 center={location}
                 zoom={13}
-                className={styles.map}
+                style={{ width: '100%', height: '100%' }}
                 zoomControl={true}
                 scrollWheelZoom={true}
             >
@@ -118,6 +128,6 @@ export default function Map({ isSidebarVisible, isLeftSidebarVisible }: MapProps
                 </Marker>
                 <MapUpdater center={location} />
             </MapContainer>
-        </div>
+        </Box>
     );
 }

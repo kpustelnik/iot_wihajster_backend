@@ -1,12 +1,39 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import styles from './LeftSidebar.module.css';
-import { familiesApi } from '@/lib/api/families';
+import {
+    Box,
+    Drawer,
+    IconButton,
+    List,
+    ListItem,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
+    Typography,
+    CircularProgress,
+    Divider,
+    Tooltip,
+    Button,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import DevicesIcon from '@mui/icons-material/Devices';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import LogoutIcon from '@mui/icons-material/Logout';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import SettingsIcon from '@mui/icons-material/Settings';
+import SensorsIcon from '@mui/icons-material/Sensors';
+import BluetoothIcon from '@mui/icons-material/Bluetooth';
 import { authUtils } from '@/lib/auth';
-import type { FamilyModel, DeviceModel } from '@/lib/api/schemas';
+import type { DeviceModel } from '@/lib/api/schemas';
 import { devicesApi } from '@/lib/api';
 
-export type MenuOption = 'families' | 'devices' | 'account';
+export type MenuOption = 'devices' | 'account' | 'bluetooth';
 
 interface LeftSidebarProps {
     onSelectOption: (option: MenuOption) => void;
@@ -14,11 +41,13 @@ interface LeftSidebarProps {
     isSidebarVisible: boolean;
 }
 
+const DRAWER_WIDTH = 280;
+const ICON_BAR_WIDTH = 56;
+
 export default function LeftSidebar({ onSelectOption, onSelectDevice, isSidebarVisible }: LeftSidebarProps) {
     const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [expandedSection, setExpandedSection] = useState<MenuOption | null>(null);
-    const [families, setFamilies] = useState<FamilyModel[]>([]);
+    const [expandedSection, setExpandedSection] = useState<MenuOption | false>(false);
     const [devices, setDevices] = useState<DeviceModel[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -31,15 +60,10 @@ export default function LeftSidebar({ onSelectOption, onSelectDevice, isSidebarV
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Fetch families
-            const familiesData = await familiesApi.getFamilies();
-            setFamilies(familiesData.content || []);
-
-            // Fetch all devices from all families
-            const allDevices = await devicesApi.list();
+            const allDevices = await devicesApi.listOwned();
             setDevices(allDevices.content || []);
         } catch (error) {
-            console.error('Failed to fetch data:', error);
+            console.error('Failed to fetch devices:', error);
         } finally {
             setLoading(false);
         }
@@ -48,197 +72,204 @@ export default function LeftSidebar({ onSelectOption, onSelectDevice, isSidebarV
     const handleToggleMenu = () => {
         setIsMenuOpen(!isMenuOpen);
         if (!isMenuOpen) {
-            setExpandedSection(null);
+            setExpandedSection(false);
         }
     };
 
     const handleIconClick = (option: MenuOption) => {
-        // Open menu and expand the corresponding section
+        if (option === 'bluetooth') {
+            onSelectOption('bluetooth');
+            setIsMenuOpen(false);
+            return;
+        }
         setIsMenuOpen(true);
         setExpandedSection(option);
     };
 
-    const handleOptionClick = (option: MenuOption) => {
-        onSelectOption(option);
-        setIsMenuOpen(false);
-        setExpandedSection(null);
-    };
-
-    const handleAccordionToggle = (section: MenuOption) => {
-        setExpandedSection(expandedSection === section ? null : section);
+    const handleAccordionChange = (panel: MenuOption) => (_: React.SyntheticEvent, isExpanded: boolean) => {
+        setExpandedSection(isExpanded ? panel : false);
     };
 
     const handleLogout = () => {
-        // Clear authentication data
         authUtils.clearAuth();
-        // Redirect to login page
         router.push('/login');
     };
 
+    if (!isSidebarVisible) return null;
+
     return (
         <>
-            {isSidebarVisible && (
-                <div className={styles.sidebar}>
-                    <button
-                        className={`${styles.iconButton} ${isMenuOpen ? styles.active : ''}`}
+            {/* Icon Bar */}
+            <Box
+                sx={{
+                    position: 'fixed',
+                    left: 0,
+                    top: 0,
+                    width: ICON_BAR_WIDTH,
+                    height: '100vh',
+                    bgcolor: 'background.paper',
+                    borderRight: 1,
+                    borderColor: 'divider',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    py: 1,
+                    zIndex: 1200,
+                }}
+            >
+                <Tooltip title="Menu" placement="right">
+                    <IconButton
                         onClick={handleToggleMenu}
-                        aria-label="Menu"
-                        title="Menu"
+                        color={isMenuOpen ? 'primary' : 'default'}
+                        sx={{ mb: 2 }}
                     >
-                        <span className={styles.hamburgerIcon}>
-                            <span className={`${styles.bar} ${isMenuOpen ? styles.open : ''}`}></span>
-                            <span className={`${styles.bar} ${isMenuOpen ? styles.open : ''}`}></span>
-                            <span className={`${styles.bar} ${isMenuOpen ? styles.open : ''}`}></span>
-                        </span>
-                    </button>
+                        <MenuIcon />
+                    </IconButton>
+                </Tooltip>
+                
+                <Divider sx={{ width: '80%', mb: 1 }} />
 
-                    <button
-                        className={styles.iconButton}
-                        onClick={() => handleIconClick('devices')}
-                        aria-label="Devices"
-                        title="Devices"
-                    >
-                        <span className={styles.icon}>📱</span>
-                    </button>
+                <Tooltip title="Urządzenia" placement="right">
+                    <IconButton onClick={() => handleIconClick('devices')}>
+                        <DevicesIcon />
+                    </IconButton>
+                </Tooltip>
 
-                    <button
-                        className={styles.iconButton}
-                        onClick={() => handleIconClick('families')}
-                        aria-label="Families"
-                        title="Families"
-                    >
-                        <span className={styles.icon}>👨‍👩‍👧‍👦</span>
-                    </button>
+                <Tooltip title="Połącz przez Bluetooth" placement="right">
+                    <IconButton onClick={() => handleIconClick('bluetooth')} color="primary">
+                        <BluetoothIcon />
+                    </IconButton>
+                </Tooltip>
 
-                    <button
-                        className={styles.iconButton}
-                        onClick={() => handleIconClick('account')}
-                        aria-label="Account"
-                        title="Account"
-                    >
-                        <span className={styles.icon}>👤</span>
-                    </button>
-                </div>
-            )}
+                <Tooltip title="Konto" placement="right">
+                    <IconButton onClick={() => handleIconClick('account')}>
+                        <AccountCircleIcon />
+                    </IconButton>
+                </Tooltip>
+            </Box>
 
-            {isMenuOpen && isSidebarVisible && (
-                <>
-                    <div className={styles.overlay} onClick={handleToggleMenu} />
-                    <div className={styles.expandedMenu}>
-                        <h3 className={styles.menuTitle}>Menu</h3>
+            {/* Expanded Drawer */}
+            <Drawer
+                anchor="left"
+                open={isMenuOpen}
+                onClose={handleToggleMenu}
+                sx={{
+                    '& .MuiDrawer-paper': {
+                        width: DRAWER_WIDTH,
+                        marginLeft: `${ICON_BAR_WIDTH}px`,
+                    },
+                }}
+            >
+                <Box sx={{ p: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                        Menu
+                    </Typography>
+                </Box>
+                
+                <Divider />
 
-                        {/* Devices Accordion */}
-                        <div className={styles.accordionSection}>
-                            <button
-                                className={`${styles.accordionHeader} ${expandedSection === 'devices' ? styles.expanded : ''}`}
-                                onClick={() => handleAccordionToggle('devices')}
-                            >
-                                <span className={styles.accordionIcon}>📱</span>
-                                <span>Devices</span>
-                                <span className={styles.chevron}>
-                                    {expandedSection === 'devices' ? '▼' : '▶'}
-                                </span>
-                            </button>
-                            {expandedSection === 'devices' && (
-                                <div className={styles.accordionContent}>
-                                    {loading ? (
-                                        <div className={styles.loadingText}>Loading...</div>
-                                    ) : devices.length > 0 ? (
-                                        devices.map((device) => (
-                                            <button
-                                                key={device.id}
-                                                className={styles.accordionItem}
-                                                onClick={() => {
-                                                    onSelectDevice(device);
-                                                    setIsMenuOpen(false);
-                                                }}
-                                            >
-                                                <span className={styles.itemIcon}>📟</span>
-                                                <span>Device {device.id}</span>
-                                            </button>
-                                        ))
-                                    ) : (
-                                        <div className={styles.emptyText}>No devices found</div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                {/* Devices Accordion */}
+                <Accordion 
+                    expanded={expandedSection === 'devices'} 
+                    onChange={handleAccordionChange('devices')}
+                    disableGutters
+                    elevation={0}
+                >
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <DevicesIcon sx={{ mr: 2 }} />
+                        <Typography>Urządzenia</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ p: 0 }}>
+                        {loading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                                <CircularProgress size={24} />
+                            </Box>
+                        ) : devices.length > 0 ? (
+                            <List dense>
+                                {devices.map((device) => (
+                                    <ListItem key={device.id} disablePadding>
+                                        <ListItemButton 
+                                            onClick={() => {
+                                                onSelectDevice(device);
+                                                setIsMenuOpen(false);
+                                            }}
+                                        >
+                                            <ListItemIcon>
+                                                <SensorsIcon fontSize="small" />
+                                            </ListItemIcon>
+                                            <ListItemText primary={`Urządzenie ${device.id}`} />
+                                        </ListItemButton>
+                                    </ListItem>
+                                ))}
+                            </List>
+                        ) : (
+                            <Box sx={{ p: 2 }}>
+                                <Typography color="text.secondary" gutterBottom>
+                                    Brak urządzeń
+                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<BluetoothIcon />}
+                                    onClick={() => {
+                                        onSelectOption('bluetooth');
+                                        setIsMenuOpen(false);
+                                    }}
+                                >
+                                    Połącz nowe urządzenie
+                                </Button>
+                            </Box>
+                        )}
+                    </AccordionDetails>
+                </Accordion>
 
-                        {/* Families Accordion */}
-                        <div className={styles.accordionSection}>
-                            <button
-                                className={`${styles.accordionHeader} ${expandedSection === 'families' ? styles.expanded : ''}`}
-                                onClick={() => handleAccordionToggle('families')}
-                            >
-                                <span className={styles.accordionIcon}>👨‍👩‍👧‍👦</span>
-                                <span>Families</span>
-                                <span className={styles.chevron}>
-                                    {expandedSection === 'families' ? '▼' : '▶'}
-                                </span>
-                            </button>
-                            {expandedSection === 'families' && (
-                                <div className={styles.accordionContent}>
-                                    {loading ? (
-                                        <div className={styles.loadingText}>Loading...</div>
-                                    ) : families.length > 0 ? (
-                                        families.map((family) => (
-                                            <button
-                                                key={family.id}
-                                                className={styles.accordionItem}
-                                                onClick={() => handleOptionClick('families')}
-                                            >
-                                                <span className={styles.itemIcon}>🏠</span>
-                                                <span>{family.name}</span>
-                                            </button>
-                                        ))
-                                    ) : (
-                                        <div className={styles.emptyText}>No families found</div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Account Accordion */}
-                        <div className={styles.accordionSection}>
-                            <button
-                                className={`${styles.accordionHeader} ${expandedSection === 'account' ? styles.expanded : ''}`}
-                                onClick={() => handleAccordionToggle('account')}
-                            >
-                                <span className={styles.accordionIcon}>👤</span>
-                                <span>Account</span>
-                                <span className={styles.chevron}>
-                                    {expandedSection === 'account' ? '▼' : '▶'}
-                                </span>
-                            </button>
-                            {expandedSection === 'account' && (
-                                <div className={styles.accordionContent}>
-                                    <button
-                                        className={styles.accordionItem}
-                                        onClick={handleLogout}
-                                    >
-                                        <span className={styles.itemIcon}>🚪</span>
-                                        <span>Logout</span>
-                                    </button>
-                                    <button
-                                        className={styles.accordionItem}
-                                        onClick={() => handleOptionClick('account')}
-                                    >
-                                        <span className={styles.itemIcon}>🔔</span>
-                                        <span>Notifications</span>
-                                    </button>
-                                    <button
-                                        className={styles.accordionItem}
-                                        onClick={() => handleOptionClick('account')}
-                                    >
-                                        <span className={styles.itemIcon}>⚙️</span>
-                                        <span>Update</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </>
-            )}
+                {/* Account Accordion */}
+                <Accordion 
+                    expanded={expandedSection === 'account'} 
+                    onChange={handleAccordionChange('account')}
+                    disableGutters
+                    elevation={0}
+                >
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <AccountCircleIcon sx={{ mr: 2 }} />
+                        <Typography>Konto</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ p: 0 }}>
+                        <List dense>
+                            <ListItem disablePadding>
+                                <ListItemButton onClick={handleLogout}>
+                                    <ListItemIcon>
+                                        <LogoutIcon fontSize="small" />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Wyloguj" />
+                                </ListItemButton>
+                            </ListItem>
+                            <ListItem disablePadding>
+                                <ListItemButton onClick={() => {
+                                    onSelectOption('account');
+                                    setIsMenuOpen(false);
+                                }}>
+                                    <ListItemIcon>
+                                        <NotificationsIcon fontSize="small" />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Powiadomienia" />
+                                </ListItemButton>
+                            </ListItem>
+                            <ListItem disablePadding>
+                                <ListItemButton onClick={() => {
+                                    onSelectOption('account');
+                                    setIsMenuOpen(false);
+                                }}>
+                                    <ListItemIcon>
+                                        <SettingsIcon fontSize="small" />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Ustawienia" />
+                                </ListItemButton>
+                            </ListItem>
+                        </List>
+                    </AccordionDetails>
+                </Accordion>
+            </Drawer>
         </>
     );
 }

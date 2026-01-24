@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
 from starlette import status
 import uuid
 import random
 import json
+from datetime import datetime
+from typing import Optional
 
 from app_common.database import get_db
 from app_common.models.user import UserType, User
+from app_common.models.device import Device, SettingsStatus
 from app_common.schemas.default import LimitedResponse
 from frontend_api.docs import Tags
 from frontend_api.repos import device_repo
@@ -22,6 +26,7 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
 
 from frontend_api.utils.auth.auth import RequireUser
+from pydantic import BaseModel, Field
 
 router = APIRouter(
     prefix="/devices",
@@ -84,12 +89,30 @@ async def get_devices(
     return await device_repo.get_devices(db, current_user, offset, limit)
 
 
+@router.get(
+    "/owned",
+    dependencies=[],
+    tags=[],
+    response_model=LimitedResponse[DeviceModel],
+    status_code=status.HTTP_200_OK,
+    summary="Get devices directly owned by user",
+    response_description="Devices where user_id matches current user",
+)
+async def get_owned_devices(
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=0, le=500),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN]))
+):
+    """Get devices directly assigned to user (bound via BLE handshake)"""
+    return await device_repo.get_owned_devices(db, current_user, offset, limit)
+
+
 challenges = {}
 @router.post(
     "/connect",
     dependencies=[],
     tags=[],
-    #response_model=FamilyModel,
     responses=None,
     status_code=status.HTTP_201_CREATED,
     summary="Start device connection",
@@ -97,9 +120,20 @@ challenges = {}
 )
 async def init_device_connection(
         req: DeviceConnectInit,
-#        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
-#        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db),
 ):
+    """
+    Initialize device connection.
+    
+    The user_id is included in the signed payload sent to the device.
+    The device will:
+    - Accept connection if device has no owner (and bind to this user)
+    - Accept connection if device owner matches this user
+    - Reject connection if device is bound to a different user
+    
+    This ensures the device is the source of truth for ownership.
+    """
     ca = CertificateAuthority()
 
     cert = x509.load_pem_x509_certificate(req.cert.encode("utf-8"), default_backend())
@@ -113,21 +147,33 @@ async def init_device_connection(
     
     device_serial_number = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
     print("Device serial number is", device_serial_number)
+    
+    # Get device from database to check current ownership
+    device_id = int(device_serial_number)
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    
+    if device is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found in database"
+        )
 
     challenge_uuid = uuid.uuid4()
     challenge = {
         'serial_number': device_serial_number,
-        # TODO: store the connection init timestamp (to prefer the most recent inits over older ones)
+        'user_id': current_user.id,
+        'timestamp': int(uuid.uuid1().time),  # For replay protection
         'pin': random.randint(100000, 999999)
     }
     challenges[str(challenge_uuid)] = challenge
 
-    # TODO: Also insert information about the user id?
-    # The device could then refuse to accept connection (requiring it to perform a hardware settings reset before authenticating)
-    # This is to make it to disallow anonymous connections
+    # Include user_id in the payload sent to device
+    # Device will use this to verify/bind ownership
     payload = json.dumps({
         'pin': challenge['pin'],
-        'challenge': str(challenge_uuid)
+        'challenge': str(challenge_uuid),
+        'user_id': current_user.id  # Device uses this to check/set owner
     })
     with open("/certs/ca_key.key", "rb") as f:
         ca_private_key = serialization.load_pem_private_key(
@@ -177,7 +223,6 @@ async def init_device_connection(
     "/confirm",
     dependencies=[],
     tags=[],
-    #response_model=FamilyModel,
     responses=None,
     status_code=status.HTTP_201_CREATED,
     summary="Confirm device connection",
@@ -185,8 +230,8 @@ async def init_device_connection(
 )
 async def confirm_device_connection(
         req: DeviceConnectConfirm,
-#        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
-#        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(RequireUser([UserType.ADMIN, UserType.CLIENT])),
+        db: AsyncSession = Depends(get_db),
 ):
     ca = CertificateAuthority()
 
@@ -253,14 +298,293 @@ async def confirm_device_connection(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown challenge"
         )
-    # TODO: Confirm that the certificate is matching challenged device
-    # TODO: Create device credential (?)
+    
     challenge = challenges[challenge_uuid]
     if challenge['pin'] != pin or challenge['serial_number'] != device_serial_number:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect response"
         )
+    
+    # Verify user matches the one who initiated the connection
+    if challenge.get('user_id') != current_user.id:
+        del challenges[challenge_uuid]
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User mismatch - connection initiated by different user"
+        )
+    
+    # Check challenge_echo for replay protection
+    challenge_echo = data_msg.get('challenge_echo')
+    if challenge_echo != challenge_uuid:
+        del challenges[challenge_uuid]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Challenge mismatch - possible replay attack"
+        )
+    
+    # Get binding status from device response
+    binding_status = data_msg.get('binding_status', 0)
+    owner_user_id = data_msg.get('owner_user_id', 0)
+    
+    # Handle binding status
+    # 0 = connection ok, no binding change
+    # 1 = device bound/confirmed to this user
+    # 2 = device bound to different user (error response - shouldn't reach here)
+    
     del challenges[challenge_uuid]
+    
+    if binding_status == 2:
+        # Device rejected - bound to different user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Device is bound to another user (user_id: {owner_user_id}). They must release it and perform factory reset on device."
+        )
+    
+    # Update database with device ownership
+    device_id = int(device_serial_number)
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    
+    if binding_status == 1 or owner_user_id == current_user.id:
+        if device is not None:
+            # Device exists - update ownership
+            stmt = update(Device).where(Device.id == device_id).values(
+                user_id=current_user.id,
+                status=SettingsStatus.ACCEPTED
+            )
+            await db.execute(stmt)
+            await db.commit()
+            print(f"Device {device_id} bound to user {current_user.id} in database (updated)")
+        else:
+            # Device doesn't exist in database - create it with correct ID
+            # This can happen if device was provisioned but DB was reset
+            from sqlalchemy import text
+            stmt = text("""
+                INSERT INTO devices (id, user_id, status, day_collection_interval, night_collection_interval, day_start, day_end, privacy, battery)
+                VALUES (:id, :user_id, :status, 60, 120, '06:00:00', '22:00:00', 0, 0)
+                ON CONFLICT (id) DO UPDATE SET user_id = :user_id, status = :status
+            """)
+            await db.execute(stmt, {
+                'id': device_id,
+                'user_id': current_user.id,
+                'status': SettingsStatus.ACCEPTED.value
+            })
+            # Also update the sequence to avoid future conflicts
+            await db.execute(text("SELECT setval('devices_id_seq', GREATEST((SELECT MAX(id) FROM devices), :id))"), {'id': device_id})
+            await db.commit()
+            print(f"Device {device_id} created and bound to user {current_user.id} in database (new)")
+    
     return {
-        'pin': pin
+        'pin': pin,
+        'binding_status': binding_status,
+        'owner_user_id': owner_user_id
     }
+
+
+# ==================== Device Ownership Management ====================
+
+class DeviceReleaseRequest(BaseModel):
+    """Request to release device ownership"""
+    device_id: int = Field(..., description="ID urządzenia do zwolnienia")
+
+
+# NOTE: Direct /claim endpoint is REMOVED
+# Device claiming now happens through the encrypted BLE handshake:
+# 1. User calls /connect with device certificate
+# 2. Backend returns signed payload with user_id
+# 3. Frontend sends payload to device via BLE proxied_communication
+# 4. Device validates, binds user if unbound, returns signed response
+# 5. Frontend calls /confirm with device response
+# 6. Backend verifies and updates database based on device confirmation
+#
+# This ensures the DEVICE is the source of truth for ownership.
+# The device can be reset via factory reset (hold BOOT button 10s).
+
+
+@router.post(
+    "/release",
+    status_code=status.HTTP_200_OK,
+    summary="Release device ownership",
+)
+async def release_device(
+    req: DeviceReleaseRequest,
+    current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Zwolnij urządzenie - usuń przypisanie w bazie danych.
+    
+    UWAGA: To tylko zwalnia przypisanie w bazie danych backendu.
+    Urządzenie nadal ma zapisane owner_user_id lokalnie.
+    
+    Aby nowy użytkownik mógł przejąć urządzenie:
+    1. Poprzedni właściciel wywołuje /release
+    2. Wykonaj factory reset na urządzeniu (przytrzymaj BOOT przez 10s)
+    3. Nowy użytkownik łączy się przez BLE i jest automatycznie przypisany
+    """
+    result = await db.execute(select(Device).where(Device.id == req.device_id))
+    device = result.scalar_one_or_none()
+    
+    if device is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found"
+        )
+    
+    if device.user_id != current_user.id and current_user.type != UserType.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't own this device"
+        )
+    
+    stmt = update(Device).where(Device.id == req.device_id).values(
+        user_id=None,
+        status=SettingsStatus.PENDING
+    )
+    await db.execute(stmt)
+    await db.commit()
+    
+    return {"message": "Device released in database. Perform factory reset on device (hold BOOT 10s) to complete transfer.", "device_id": req.device_id}
+
+
+@router.get(
+    "/{device_id}",
+    response_model=DeviceModel,
+    status_code=status.HTTP_200_OK,
+    summary="Get device details",
+)
+async def get_device(
+    device_id: int,
+    current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Pobierz szczegóły urządzenia.
+    """
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    
+    if device is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found"
+        )
+    
+    # Check permissions
+    if device.user_id != current_user.id and current_user.type != UserType.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this device"
+        )
+    
+    return device
+
+
+@router.get(
+    "/{device_id}/sensors/latest",
+    status_code=status.HTTP_200_OK,
+    summary="Get latest sensor readings",
+)
+async def get_device_sensors_latest(
+    device_id: int,
+    current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Pobierz ostatnie odczyty sensorów urządzenia.
+    """
+    from app_common.models.measurement import Measurement
+    
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    
+    if device.user_id != current_user.id and current_user.type != UserType.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this device")
+    
+    # Pobierz ostatni pomiar
+    result = await db.execute(
+        select(Measurement)
+        .where(Measurement.device_id == device_id)
+        .order_by(Measurement.time.desc())
+        .limit(1)
+    )
+    measurement = result.scalar_one_or_none()
+    
+    if measurement is None:
+        return {}
+    
+    return {
+        "timestamp": measurement.time.isoformat() if measurement.time else None,
+        "temperature": float(measurement.temperature) if measurement.temperature else None,
+        "humidity": measurement.humidity,
+        "pressure": measurement.pressure,
+        "pm2_5": measurement.PM25,
+        "pm10_0": measurement.PM10,
+        "latitude": measurement.latitude,
+        "longitude": measurement.longitude,
+    }
+
+
+@router.get(
+    "/{device_id}/sensors/history",
+    status_code=status.HTTP_200_OK,
+    summary="Get sensor history",
+)
+async def get_device_sensors_history(
+    device_id: int,
+    range: str = Query(default="24h", description="Zakres czasu: 1h, 6h, 24h, 7d, 30d"),
+    current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Pobierz historię odczytów sensorów urządzenia.
+    """
+    from app_common.models.measurement import Measurement
+    from datetime import timedelta
+    
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    
+    if device.user_id != current_user.id and current_user.type != UserType.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this device")
+    
+    # Parse time range
+    time_ranges = {
+        "1h": timedelta(hours=1),
+        "6h": timedelta(hours=6),
+        "24h": timedelta(hours=24),
+        "7d": timedelta(days=7),
+        "30d": timedelta(days=30),
+    }
+    delta = time_ranges.get(range, timedelta(hours=24))
+    since = datetime.utcnow() - delta
+    
+    # Pobierz pomiary
+    result = await db.execute(
+        select(Measurement)
+        .where(Measurement.device_id == device_id)
+        .where(Measurement.time >= since)
+        .order_by(Measurement.time.asc())
+        .limit(1000)
+    )
+    measurements = result.scalars().all()
+    
+    return [
+        {
+            "timestamp": m.time.isoformat() if m.time else None,
+            "temperature": float(m.temperature) if m.temperature else None,
+            "humidity": m.humidity,
+            "pressure": m.pressure,
+            "pm2_5": m.PM25,
+            "pm10_0": m.PM10,
+            "latitude": m.latitude,
+            "longitude": m.longitude,
+        }
+        for m in measurements
+    ]
