@@ -21,19 +21,16 @@ async def fix_postgres_sequences(session):
     # List of tables with sequences that need fixing
     # Table names must match actual PostgreSQL table names (usually plural)
     tables_with_sequences = [
-        ('users', 'users_id_seq'),
-        ('devices', 'devices_id_seq'),
-        ('families', 'families_id_seq'),
-        ('family_members', 'family_members_id_seq'),
-        ('family_devices', 'family_devices_id_seq'),
-        ('measurements', 'measurements_id_seq'),
+        ('users', 'users_id_seq', 'id'),
+        ('devices', 'devices_id_seq', 'id'),
+        ('families', 'families_id_seq', 'id')
     ]
     
-    for table_name, seq_name in tables_with_sequences:
+    for table_name, seq_name, id_field in tables_with_sequences:
         try:
             # Check if table exists and has data
             result = await session.execute(
-                text(f"SELECT COALESCE(MAX(id), 0) + 1 FROM {table_name}")
+                text(f"SELECT COALESCE(MAX({id_field}), 0) + 1 FROM {table_name}")
             )
             next_val = result.scalar()
             
