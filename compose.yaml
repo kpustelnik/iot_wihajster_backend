@@ -41,6 +41,11 @@ services:
       - AWS_CA_REGISTRATION_CODE=${AWS_CA_REGISTRATION_CODE}
       - USE_AWS_MQTT=${USE_AWS_MQTT}
       - AWS_IOT_ENDPOINT=${AWS_IOT_ENDPOINT}
+      - S3_BUCKET_ENDPOINT=${S3_BUCKET_ENDPOINT}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
     depends_on:
       db:
         condition: service_healthy
