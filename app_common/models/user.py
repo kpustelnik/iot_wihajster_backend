@@ -18,6 +18,9 @@ class User(Base):
     login: Mapped[str] = mapped_column(unique=True)
     password: Mapped[str] = mapped_column()
     type: Mapped[str] = mapped_column(sqlalchemy.Enum(UserType))
+    discord_id: Mapped[str] = mapped_column(unique=True, nullable=True, default=None)
+    discord_username: Mapped[str] = mapped_column(nullable=True, default=None)
+    discord_avatar: Mapped[str] = mapped_column(nullable=True, default=None)
 
     devices = relationship(
         "Device",
