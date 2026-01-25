@@ -1,17 +1,29 @@
 import logging
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app_common.models.device import Device
 from app_common.models.measurement import Measurement
+from app_common.models.ownership import Ownership
 from app_common.schemas.device import DeviceSettings
 from app_common.schemas.measurement import MeasurementCreate
 
 from device_api.schemas.device import DeviceUpdateModel, DeviceData
 
 logger = logging.getLogger('uvicorn.error')
+
+
+async def get_active_ownership(db: AsyncSession, device_id: int) -> Ownership | None:
+    """Pobiera aktywny ownership dla urządzenia"""
+    query = select(Ownership).where(
+        and_(
+            Ownership.device_id == device_id,
+            Ownership.is_active == True
+        )
+    )
+    return await db.scalar(query)
 
 
 async def create_measurement(
@@ -23,16 +35,19 @@ async def create_measurement(
     settings = await db.scalar(query)
     settings = DeviceSettings.model_validate(settings.to_dict())
 
-    measurement = MeasurementCreate.model_validate(device_data_dict | {"device_id": device_data.id})
+    # Pobierz aktywny ownership dla urządzenia
+    ownership = await get_active_ownership(db, device_data.id)
+    if ownership is None:
+        logger.warning(f"No active ownership found for device {device_data.id}, skipping measurement")
+        return settings
+
+    measurement_data = device_data_dict.copy()
+    measurement_data["ownership_id"] = ownership.id
+    measurement = MeasurementCreate.model_validate(measurement_data)
     measurement = Measurement(**measurement.model_dump())
-    # TODO user can change settings but the device will override them, do it better
-    device_update = DeviceUpdateModel.model_validate(device_data_dict)
+    
     try:
         db.add(measurement)
-        # stmt = (update(Device).
-        #         where(Device.id == device_data.id).
-        #         values({k: v if v != "null" else None for k, v in device_update.model_dump().items()}))
-        # await db.execute(stmt)
         await db.commit()
     except IntegrityError as e:
         await db.rollback()

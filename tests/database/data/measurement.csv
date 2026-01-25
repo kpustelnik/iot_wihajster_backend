@@ -1,4 +1,4 @@
-device_id,time,humidity,temperature,pressure,PM25,PM10,longitude,latitude
+ownership_id,time,humidity,temperature,pressure,PM25,PM10,longitude,latitude
 1,2025-11-01 00:00:00,69,16.75,995,9,13,19.944922,50.050146
 1,2025-11-01 00:28:48,70,15.79,998,9,15,19.944083,50.050638
 1,2025-11-01 00:57:36,71,16.97,998,10,16,19.944979,50.048984

@@ -17,7 +17,8 @@ class Timescale(StrEnum):
 
 
 class MeasurementModel(BaseModel):
-    device_id: int = Field(ge=1, examples=[1])
+    ownership_id: int = Field(ge=1, examples=[1])
+    device_id: Optional[int] = Field(ge=1, examples=[1], default=None)  # Opcjonalne - może być pobrane z ownership
     time: datetime = Field(examples=[datetime.now()])
     humidity: Optional[float] = Field(examples=[10.5], default=None)
     temperature: Optional[float] = Field(examples=[21.37], default=None)

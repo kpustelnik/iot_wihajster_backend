@@ -12,6 +12,7 @@ from app_common.database import sessionmanager
 from app_common.models.device import Device, PrivacyLevel
 from app_common.models.family import FamilyDevice, FamilyMember, FamilyStatus
 from app_common.models.measurement import Measurement
+from app_common.models.ownership import Ownership
 from app_common.models.user import User
 from app_common.schemas.default import LimitedResponse
 from app_common.schemas.device import DeviceModel
@@ -37,24 +38,31 @@ async def get_measurements(
         FamilyMember.status == FamilyStatus.ACCEPTED)
     ).scalar_subquery()
 
-    # publiczne + własne + family
+    # Pomiary przez Ownership - użytkownik widzi tylko swoje pomiary (przez aktywny ownership)
+    # lub publiczne/protected przez family
     query = (
         select(Measurement)
-        .join(Device, Measurement.device_id == Device.id)
-        .join(FamilyDevice, FamilyDevice.device_id == Measurement.device_id)
+        .join(Ownership, Measurement.ownership_id == Ownership.id)
+        .join(Device, Ownership.device_id == Device.id)
+        .outerjoin(FamilyDevice, FamilyDevice.device_id == Device.id)
         .where(or_(
+            # Własne pomiary (użytkownik jest właścicielem ownership)
+            Ownership.user_id == user.id,
+            # Publiczne urządzenia
+            Device.privacy == PrivacyLevel.PUBLIC,
+            # Protected urządzenia z family użytkownika
             and_(
                 FamilyDevice.family_id.in_(family_ids_subq),
-                Device.privacy == PrivacyLevel.PROTECTED),
-            Device.privacy == PrivacyLevel.PUBLIC))
+                Device.privacy == PrivacyLevel.PROTECTED
+            )
+        ))
     )
 
     if device_id is not None:
-        query = query.where(Measurement.device_id == device_id)
+        query = query.where(Ownership.device_id == device_id)
 
     if family_id is not None:
-        query = query.join(FamilyDevice, FamilyDevice.device_id == Measurement.device_id).where(
-            FamilyDevice.family_id == family_id)
+        query = query.where(FamilyDevice.family_id == family_id)
 
     if time_from is not None:
         query = query.where(Measurement.time >= time_from)
@@ -83,19 +91,24 @@ async def get_measurements(
     count_query = (
         select(func.count())
         .select_from(Measurement)
-        .join(Device, Measurement.device_id == Device.id)
-        .join(FamilyDevice, FamilyDevice.device_id == Measurement.device_id)
-        .where((FamilyDevice.family_id.in_(family_ids_subq) & (Device.privacy == PrivacyLevel.PROTECTED))
-               |
-               (Device.privacy == PrivacyLevel.PUBLIC))
+        .join(Ownership, Measurement.ownership_id == Ownership.id)
+        .join(Device, Ownership.device_id == Device.id)
+        .outerjoin(FamilyDevice, FamilyDevice.device_id == Device.id)
+        .where(or_(
+            Ownership.user_id == user.id,
+            Device.privacy == PrivacyLevel.PUBLIC,
+            and_(
+                FamilyDevice.family_id.in_(family_ids_subq),
+                Device.privacy == PrivacyLevel.PROTECTED
+            )
+        ))
     )
 
     if device_id is not None:
-        count_query = count_query.where(Measurement.device_id == device_id)
+        count_query = count_query.where(Ownership.device_id == device_id)
 
     if family_id is not None:
-        count_query = count_query.join(FamilyDevice, FamilyDevice.device_id == Measurement.device_id).where(
-            FamilyDevice.family_id == family_id)
+        count_query = count_query.where(FamilyDevice.family_id == family_id)
 
     if time_from is not None:
         count_query = count_query.where(Measurement.time >= time_from)
@@ -146,10 +159,11 @@ async def get_measurements(
             func.concat('1 ', base_granularity), INTERVAL
         )
 
-        # Aggregate numeric values
+        # Aggregate numeric values - używamy ownership_id i device_id przez join
         query = (
             select(
-                Measurement.device_id.label("device_id"),
+                Measurement.ownership_id.label("ownership_id"),
+                Ownership.device_id.label("device_id"),
                 bucket_time.label("time"),
                 func.avg(Measurement.humidity).label("humidity"),
                 func.avg(Measurement.temperature).label("temperature"),
@@ -160,8 +174,9 @@ async def get_measurements(
                 func.avg(Measurement.latitude).label("latitude"),
             )
             .select_from(Measurement)
+            .join(Ownership, Measurement.ownership_id == Ownership.id)
             .where(query.whereclause)
-            .group_by(bucket_time, Measurement.device_id)
+            .group_by(bucket_time, Measurement.ownership_id, Ownership.device_id)
             .order_by(bucket_time.desc())
         )
         query = query.offset(offset).limit(limit)

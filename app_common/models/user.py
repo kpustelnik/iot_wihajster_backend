@@ -38,3 +38,10 @@ class User(Base):
         passive_deletes=True,
         cascade="all, delete"
     )
+
+    ownerships = relationship(
+        "Ownership",
+        back_populates="user",
+        passive_deletes=True,
+        cascade="all, delete"
+    )

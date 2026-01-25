@@ -38,3 +38,10 @@ class Device(Base):
         passive_deletes=True,
         cascade="all, delete"
     )
+
+    ownerships = relationship(
+        "Ownership",
+        back_populates="device",
+        passive_deletes=True,
+        cascade="all, delete"
+    )
