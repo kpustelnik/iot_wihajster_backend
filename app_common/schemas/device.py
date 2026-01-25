@@ -10,6 +10,7 @@ from app_common.utils.schemas_decorators import omit
 class DeviceModel(BaseModel):
     id: int = Field(ge=1, examples=[1])
     user_id: int | None = Field(ge=1, examples=[1], default=None)
+    chip_type: str = Field(examples=["esp32c6"], default="esp32c6", description="Typ chipa (esp32, esp32c6, esp32s3, etc.)")
     day_collection_interval: datetime.timedelta = Field(examples=[datetime.timedelta(minutes=5)], default=datetime.timedelta(minutes=5))
     night_collection_interval: datetime.timedelta = Field(examples=[datetime.timedelta(minutes=15)], default=datetime.timedelta(minutes=15))
     day_start: datetime.time = Field(examples=[datetime.time(hour=22)], default=datetime.time(hour=22))

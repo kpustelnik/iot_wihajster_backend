@@ -24,6 +24,7 @@ class Device(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True, index=True, default=None)  # null on delete
+    chip_type: Mapped[str] = mapped_column(nullable=False, default="esp32c6")  # typ chipa: esp32, esp32c6, esp32s3, etc.
     day_collection_interval: Mapped[datetime.timedelta] = mapped_column(Interval, default=datetime.timedelta(minutes=5))
     night_collection_interval: Mapped[datetime.timedelta] = mapped_column(Interval, default=datetime.timedelta(minutes=15))
     day_start: Mapped[datetime.time] = mapped_column(Time, default=datetime.time(hour=6))

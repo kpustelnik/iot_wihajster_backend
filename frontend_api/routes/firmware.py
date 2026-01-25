@@ -535,11 +535,11 @@ async def deploy_firmware(
             detail="You don't have permission to update this device"
         )
 
-    # Znajdź firmware
-    # TODO: dodać chip_type do Device i używać go tutaj
+    # Znajdź firmware dla typu chipa urządzenia
     firmware_result = await db.execute(
         select(Firmware).where(
             Firmware.version == req.version,
+            Firmware.chip_type == device.chip_type,
             Firmware.is_active == True
         )
     )
@@ -548,7 +548,7 @@ async def deploy_firmware(
     if not firmware:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Firmware version {req.version} not found"
+            detail=f"Firmware version {req.version} for chip type {device.chip_type} not found"
         )
 
     # Wygeneruj presigned URL ważny 24h
@@ -594,12 +594,12 @@ async def check_for_updates(
     device_id: int,
     current_version: str,
     current_version_code: int,
-    chip_type: str = "esp32c6",
     current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Sprawdź czy jest dostępna nowa wersja firmware dla urządzenia.
+    Typ chipa jest pobierany automatycznie z urządzenia.
     """
     # Sprawdź czy urządzenie istnieje i użytkownik ma dostęp
     device_result = await db.execute(select(Device).where(Device.id == device_id))
@@ -617,10 +617,10 @@ async def check_for_updates(
             detail="You don't have access to this device"
         )
 
-    # Znajdź dostępne firmware dla tego typu chipa
+    # Znajdź dostępne firmware dla typu chipa urządzenia
     query = select(Firmware).where(
         Firmware.is_active == True,
-        Firmware.chip_type == chip_type
+        Firmware.chip_type == device.chip_type
     )
     result = await db.execute(query)
     firmwares = result.scalars().all()
@@ -630,7 +630,7 @@ async def check_for_updates(
             update_available=False,
             current_version=current_version,
             current_version_code=current_version_code,
-            message=f"No firmware available for chip type: {chip_type}"
+            message=f"No firmware available for chip type: {device.chip_type}"
         )
 
     # Znajdź najnowszą wersję (po version_code)
