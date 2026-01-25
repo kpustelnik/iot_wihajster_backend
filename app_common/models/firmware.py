@@ -15,6 +15,7 @@ class Firmware(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     version: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    version_code: Mapped[int] = mapped_column(nullable=False, index=True)  # int version for ESP32
     chip_type: Mapped[str] = mapped_column(String(50), nullable=False, default="esp32c6")
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     r2_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)

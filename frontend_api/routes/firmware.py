@@ -44,23 +44,6 @@ router = APIRouter(
 )
 
 
-def parse_version(version: str) -> tuple:
-    """
-    Parsuje wersję semver do krotki dla porównań.
-    
-    Args:
-        version: String wersji (np. "1.2.3")
-        
-    Returns:
-        Krotka (major, minor, patch) lub (0, 0, 0) przy błędzie
-    """
-    try:
-        parts = version.split(".")
-        return tuple(int(p) for p in parts[:3])
-    except (ValueError, AttributeError):
-        return (0, 0, 0)
-
-
 async def firmware_to_info(firmware: Firmware, include_url: bool = True) -> FirmwareInfo:
     """
     Konwertuje model Firmware do FirmwareInfo z opcjonalnym URL.
@@ -81,6 +64,7 @@ async def firmware_to_info(firmware: Firmware, include_url: bool = True) -> Firm
 
     return FirmwareInfo(
         version=firmware.version,
+        version_code=firmware.version_code,
         filename=firmware.filename,
         size=firmware.size,
         sha256=firmware.sha256,
@@ -99,8 +83,10 @@ async def firmware_to_info(firmware: Firmware, include_url: bool = True) -> Firm
 )
 async def upload_firmware(
     version: str = Form(..., description="Wersja firmware (np. 1.0.0)", pattern=r"^\d+\.\d+\.\d+$"),
+    version_code: int = Form(..., description="Numer wersji (int) dla ESP32, np. 1, 2, 3...", ge=1),
     chip_type: str = Form(default="esp32c6", description="Typ chipa (esp32, esp32c6, esp32s3)"),
     release_notes: Optional[str] = Form(default=None, description="Notatki do wydania"),
+    force: bool = Form(default=False, description="Wymuś upload nawet jeśli istnieje nowsza wersja"),
     file: UploadFile = File(..., description="Plik binary firmware (.bin)"),
     current_user: User = Depends(RequireUser([UserType.ADMIN])),
     db: AsyncSession = Depends(get_db)
@@ -126,7 +112,7 @@ async def upload_firmware(
             detail=f"Invalid chip type. Valid options: {', '.join(valid_chips)}"
         )
 
-    # Sprawdź czy wersja już istnieje
+    # Sprawdź czy wersja (string) już istnieje
     existing = await db.execute(
         select(Firmware).where(
             Firmware.version == version,
@@ -139,6 +125,58 @@ async def upload_firmware(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Firmware version {version} for {chip_type} already exists"
         )
+
+    # Sprawdź czy version_code już istnieje
+    warning_message = None
+    existing_code_query = await db.execute(
+        select(Firmware).where(
+            Firmware.chip_type == chip_type,
+            Firmware.is_active == True,
+            Firmware.version_code == version_code
+        )
+    )
+    existing_with_same_code = existing_code_query.scalar_one_or_none()
+    if existing_with_same_code:
+        if not force:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Firmware z version_code={version_code} już istnieje dla {chip_type} "
+                       f"(wersja: {existing_with_same_code.version}). "
+                       f"Użyj flagi force=true, aby nadpisać."
+            )
+        # Nadpisz - dezaktywuj stary firmware
+        existing_with_same_code.is_active = False
+        warning_message = (
+            f"Nadpisano firmware z version_code={version_code} "
+            f"(poprzednia wersja: {existing_with_same_code.version})"
+        )
+
+    # Sprawdź czy istnieje nowsza wersja (według version_code)
+    newer_query = await db.execute(
+        select(Firmware).where(
+            Firmware.chip_type == chip_type,
+            Firmware.is_active == True,
+            Firmware.version_code > version_code
+        ).order_by(desc(Firmware.version_code)).limit(1)
+    )
+    newer_firmware = newer_query.scalar_one_or_none()
+    if newer_firmware:
+        if not force:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Istnieje już nowsza wersja firmware: {newer_firmware.version} "
+                       f"(version_code={newer_firmware.version_code}) dla {chip_type}. "
+                       f"Użyj flagi force=true, aby wymusić upload starszej wersji."
+            )
+        newer_warning = (
+            f"Uwaga: Uploadowano wersję {version} (version_code={version_code}), "
+            f"ale istnieje już nowsza wersja {newer_firmware.version} (version_code={newer_firmware.version_code})"
+        )
+        # Połącz warningi jeśli oba występują
+        if warning_message:
+            warning_message = f"{warning_message}. {newer_warning}"
+        else:
+            warning_message = newer_warning
 
     # Wczytaj zawartość pliku
     content = await file.read()
@@ -187,6 +225,7 @@ async def upload_firmware(
     try:
         db_firmware = Firmware(
             version=version,
+            version_code=version_code,
             chip_type=chip_type,
             filename=filename,
             r2_key=r2_key,
@@ -215,13 +254,15 @@ async def upload_firmware(
 
     return FirmwareUploadResponse(
         version=version,
+        version_code=version_code,
         filename=filename,
         size=len(content),
         sha256=sha256_hash,
         upload_date=db_firmware.upload_date,
         chip_type=chip_type,
         download_url=download_url,
-        message="Firmware uploaded successfully to R2"
+        message="Firmware uploaded successfully to R2",
+        warning=warning_message
     )
 
 
@@ -292,8 +333,8 @@ async def get_latest_firmware(
             detail=f"No firmware found for chip type: {chip_type}"
         )
 
-    # Sortuj po wersji semver
-    latest = max(firmwares, key=lambda fw: parse_version(fw.version))
+    # Sortuj po version_code (int)
+    latest = max(firmwares, key=lambda fw: fw.version_code)
     
     return await firmware_to_info(latest, include_url=True)
 
@@ -537,6 +578,7 @@ async def deploy_firmware(
         message="OTA command sent successfully" if success else "Failed to send OTA command",
         device_id=req.device_id,
         version=req.version,
+        version_code=firmware.version_code if success else None,
         download_url=ota_url if success else None,
         sha256=firmware.sha256 if success else None
     )
@@ -551,6 +593,7 @@ async def deploy_firmware(
 async def check_for_updates(
     device_id: int,
     current_version: str,
+    current_version_code: int,
     chip_type: str = "esp32c6",
     current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
     db: AsyncSession = Depends(get_db)
@@ -586,15 +629,14 @@ async def check_for_updates(
         return FirmwareUpdateCheck(
             update_available=False,
             current_version=current_version,
+            current_version_code=current_version_code,
             message=f"No firmware available for chip type: {chip_type}"
         )
 
-    # Znajdź najnowszą wersję
-    current_tuple = parse_version(current_version)
-    latest = max(firmwares, key=lambda fw: parse_version(fw.version))
-    latest_tuple = parse_version(latest.version)
+    # Znajdź najnowszą wersję (po version_code)
+    latest = max(firmwares, key=lambda fw: fw.version_code)
 
-    update_available = latest_tuple > current_tuple
+    update_available = latest.version_code > current_version_code
 
     latest_info = None
     if update_available:
@@ -603,7 +645,9 @@ async def check_for_updates(
     return FirmwareUpdateCheck(
         update_available=update_available,
         current_version=current_version,
+        current_version_code=current_version_code,
         latest_version=latest.version,
+        latest_version_code=latest.version_code,
         latest_info=latest_info,
         message="Update available" if update_available else "You have the latest version"
     )

@@ -10,6 +10,7 @@ class FirmwareModel(BaseModel):
     """Pełny model firmware z bazy danych."""
     id: int
     version: str
+    version_code: int
     chip_type: str
     filename: str
     r2_key: str
@@ -27,6 +28,7 @@ class FirmwareModel(BaseModel):
 class FirmwareInfo(BaseModel):
     """Publiczne informacje o firmware (bez wewnętrznych szczegółów)."""
     version: str = Field(..., description="Wersja firmware (semver)")
+    version_code: int = Field(..., description="Numer wersji (int) dla ESP32")
     filename: str = Field(..., description="Nazwa pliku firmware")
     size: int = Field(..., description="Rozmiar pliku w bajtach")
     sha256: str = Field(..., description="Hash SHA256 pliku")
@@ -48,6 +50,7 @@ class FirmwareListResponse(BaseModel):
 class FirmwareUploadResponse(BaseModel):
     """Odpowiedź po uploadzie firmware."""
     version: str
+    version_code: int
     filename: str
     size: int
     sha256: str
@@ -55,6 +58,7 @@ class FirmwareUploadResponse(BaseModel):
     chip_type: str
     download_url: str
     message: str = "Firmware uploaded successfully"
+    warning: Optional[str] = None
 
 
 class OtaDeployRequest(BaseModel):
@@ -69,6 +73,7 @@ class OtaDeployResponse(BaseModel):
     message: str
     device_id: int
     version: str
+    version_code: Optional[int] = None
     download_url: Optional[str] = None
     sha256: Optional[str] = None
 
@@ -77,7 +82,9 @@ class FirmwareUpdateCheck(BaseModel):
     """Odpowiedź sprawdzenia dostępności aktualizacji."""
     update_available: bool
     current_version: str
+    current_version_code: Optional[int] = None
     latest_version: Optional[str] = None
+    latest_version_code: Optional[int] = None
     latest_info: Optional[FirmwareInfo] = None
     message: Optional[str] = None
 
