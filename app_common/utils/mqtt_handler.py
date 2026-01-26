@@ -377,6 +377,10 @@ async def update_settings_from_device(device_id: int, data: dict):
     """
     Aktualizuje ustawienia w bazie na podstawie raportu urządzenia.
     Urządzenie wysyła swoje aktualne wartości, gdy różnią się od oczekiwanych.
+    
+    If device reports values different from our current:
+    1. Update current value to match device (device is authoritative)
+    2. Clear any pending value for that setting
     """
     session = None
     try:
@@ -390,36 +394,18 @@ async def update_settings_from_device(device_id: int, data: dict):
             logger.warning(f"[MQTT] No settings found for device {device_id}")
             return
         
-        # Update current values from device report
-        field_mapping = {
-            "wifi_ssid": "wifi_ssid",
-            "wifi_auth_mode": "wifi_auth_mode",
-            "device_mode": "device_mode",
-            "allow_unencrypted_bluetooth": "allow_unencrypted_bluetooth",
-            "enable_lte": "enable_lte",
-            "sim_pin_accepted": "sim_pin_accepted",
-            "enable_power_management": "enable_power_management",
-            "sim_pin": "sim_pin",
-            "sim_iccid": "sim_iccid",
-            "bmp280_settings": "bmp280_settings",
-            "measurement_interval_day_sec": "measurement_interval_day_sec",
-            "measurement_interval_night_sec": "measurement_interval_night_sec",
-            "daytime_start_sec": "daytime_start_sec",
-            "daytime_end_sec": "daytime_end_sec",
-            "owner_user_id": "owner_user_id",
-        }
+        # Use the model's update_from_device_report method
+        # This updates current values and clears pending if device value differs
+        updated_fields, cleared_pending = settings.update_from_device_report(data)
         
-        updated_fields = []
-        for json_field, model_field in field_mapping.items():
-            if json_field in data:
-                setattr(settings, model_field, data[json_field])
-                updated_fields.append(model_field)
-        
-        if updated_fields:
+        if updated_fields or cleared_pending:
             settings.last_sync_at = datetime.utcnow()
-            settings.sync_status = SettingSyncStatus.SYNCED
+            if not settings.has_pending_changes():
+                settings.sync_status = SettingSyncStatus.SYNCED
             await session.commit()
             logger.info(f"[MQTT] Updated settings for device {device_id}: {updated_fields}")
+            if cleared_pending:
+                logger.info(f"[MQTT] Cleared pending settings for device {device_id}: {cleared_pending}")
         
     except Exception as e:
         logger.error(f"[MQTT] Error updating settings from device: {e!r}")

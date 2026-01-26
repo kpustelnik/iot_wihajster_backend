@@ -86,29 +86,22 @@ async def update_device_settings(
     
     update_dict = update_data.model_dump(exclude_unset=True)
     
-    # Map update fields to pending fields
+    # Use the model's SETTING_FIELDS to build pending field mapping
     pending_field_mapping = {
-        "wifi_ssid": "wifi_ssid_pending",
-        "wifi_pass": "wifi_pass_pending",
-        "wifi_auth_mode": "wifi_auth_mode_pending",
-        "device_mode": "device_mode_pending",
-        "allow_unencrypted_bluetooth": "allow_unencrypted_bluetooth_pending",
-        "enable_lte": "enable_lte_pending",
-        "enable_power_management": "enable_power_management_pending",
-        "sim_pin": "sim_pin_pending",
-        "bmp280_settings": "bmp280_settings_pending",
-        "measurement_interval_day_sec": "measurement_interval_day_sec_pending",
-        "measurement_interval_night_sec": "measurement_interval_night_sec_pending",
-        "daytime_start_sec": "daytime_start_sec_pending",
-        "daytime_end_sec": "daytime_end_sec_pending",
-        "owner_user_id": "owner_user_id_pending",
+        json_key: pending_field
+        for _, pending_field, json_key in DeviceSettings.SETTING_FIELDS
     }
     
     updated = False
     for field, value in update_dict.items():
         if field in pending_field_mapping and value is not None:
+            # Get the current field name from SETTING_FIELDS
+            current_field = next(
+                (cf for cf, pf, jk in DeviceSettings.SETTING_FIELDS if jk == field),
+                field
+            )
             # Only set pending if different from current
-            current_value = getattr(settings, field)
+            current_value = getattr(settings, current_field, None)
             if current_value != value:
                 setattr(settings, pending_field_mapping[field], value)
                 updated = True
@@ -134,25 +127,11 @@ async def clear_pending_settings(
     if not settings:
         return None
     
-    pending_fields = [
-        "wifi_ssid_pending",
-        "wifi_pass_pending",
-        "wifi_auth_mode_pending",
-        "device_mode_pending",
-        "allow_unencrypted_bluetooth_pending",
-        "enable_lte_pending",
-        "enable_power_management_pending",
-        "sim_pin_pending",
-        "bmp280_settings_pending",
-        "measurement_interval_day_sec_pending",
-        "measurement_interval_night_sec_pending",
-        "daytime_start_sec_pending",
-        "daytime_end_sec_pending",
-        "owner_user_id_pending",
-    ]
+    # Use the model's clear_all_pending method
+    cleared = settings.clear_all_pending()
     
-    for field in pending_fields:
-        setattr(settings, field, None)
+    if cleared:
+        logger.info(f"Cleared pending settings for device {device_id}: {cleared}")
     
     settings.sync_status = SettingSyncStatus.SYNCED
     await db.commit()

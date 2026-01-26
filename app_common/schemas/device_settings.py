@@ -2,6 +2,7 @@
 Device Settings Schemas
 
 Pydantic schemas for device settings management and synchronization.
+Field names match device's cJSON keys exactly.
 """
 from datetime import datetime
 from typing import Optional
@@ -36,30 +37,43 @@ class WifiAuthModeEnum(IntEnum):
 # ===== Base Settings Schema =====
 
 class DeviceSettingsBase(BaseModel):
-    """Base device settings schema"""
+    """Base device settings schema - matches device cJSON fields exactly"""
     
     # WiFi
     wifi_ssid: Optional[str] = Field(None, max_length=64, description="WiFi SSID")
     wifi_pass: Optional[str] = Field(None, max_length=128, description="WiFi password")
-    wifi_auth_mode: int = Field(WifiAuthModeEnum.WPA2_PSK, description="WiFi auth mode")
+    wifi_auth: int = Field(WifiAuthModeEnum.WPA2_PSK, description="WiFi auth mode")
     
     # Device mode
     device_mode: int = Field(DeviceModeEnum.SETUP, description="Device operating mode")
     
     # Flags
-    allow_unencrypted_bluetooth: bool = Field(False, description="Allow unencrypted BLE")
-    enable_lte: bool = Field(False, description="Enable LTE modem")
-    sim_pin_accepted: bool = Field(False, description="SIM PIN was accepted")
-    enable_power_management: bool = Field(False, description="Enable power management")
+    allow_unencrypted_ble: bool = Field(False, description="Allow unencrypted BLE")
+    lte_enabled: bool = Field(False, description="Enable LTE modem")
+    ble_enabled: bool = Field(True, description="Enable Bluetooth")
+    power_management_enabled: bool = Field(False, description="Enable power management")
+    
+    # Sensor flags
+    pms5003_indoor: bool = Field(False, description="PMS5003 indoor mode")
+    pms5003_enabled: bool = Field(True, description="PMS5003 sensor enabled")
+    bmp280_enabled: bool = Field(True, description="BMP280 sensor enabled")
+    dht22_enabled: bool = Field(True, description="DHT22 sensor enabled")
+    
+    # Sensor measurement intervals (seconds)
+    pms5003_measurement_interval: int = Field(300, ge=10, le=86400, description="PMS5003 interval")
+    bmp280_measurement_interval: int = Field(300, ge=10, le=86400, description="BMP280 interval")
+    dht22_measurement_interval: int = Field(300, ge=10, le=86400, description="DHT22 interval")
+    
+    # LED
+    led_brightness: int = Field(100, ge=0, le=255, description="LED brightness")
     
     # SIM
     sim_pin: Optional[int] = Field(None, ge=0, le=9999, description="SIM PIN")
-    sim_iccid: Optional[str] = Field(None, max_length=32, description="SIM ICCID")
     
     # Sensor settings
     bmp280_settings: int = Field(0, description="BMP280 sensor settings")
     
-    # Measurement intervals (seconds)
+    # Global measurement intervals (seconds)
     measurement_interval_day_sec: int = Field(300, ge=10, le=86400, description="Day measurement interval")
     measurement_interval_night_sec: int = Field(900, ge=10, le=86400, description="Night measurement interval")
     
@@ -84,11 +98,20 @@ class DeviceSettingsRead(DeviceSettingsBase):
     # Pending values (for admin/debug view)
     wifi_ssid_pending: Optional[str] = None
     wifi_pass_pending: Optional[str] = None
-    wifi_auth_mode_pending: Optional[int] = None
+    wifi_auth_pending: Optional[int] = None
     device_mode_pending: Optional[int] = None
-    allow_unencrypted_bluetooth_pending: Optional[bool] = None
-    enable_lte_pending: Optional[bool] = None
-    enable_power_management_pending: Optional[bool] = None
+    allow_unencrypted_ble_pending: Optional[bool] = None
+    lte_enabled_pending: Optional[bool] = None
+    ble_enabled_pending: Optional[bool] = None
+    power_management_enabled_pending: Optional[bool] = None
+    pms5003_indoor_pending: Optional[bool] = None
+    pms5003_enabled_pending: Optional[bool] = None
+    bmp280_enabled_pending: Optional[bool] = None
+    dht22_enabled_pending: Optional[bool] = None
+    pms5003_measurement_interval_pending: Optional[int] = None
+    bmp280_measurement_interval_pending: Optional[int] = None
+    dht22_measurement_interval_pending: Optional[int] = None
+    led_brightness_pending: Optional[int] = None
     sim_pin_pending: Optional[int] = None
     bmp280_settings_pending: Optional[int] = None
     measurement_interval_day_sec_pending: Optional[int] = None
@@ -105,11 +128,20 @@ class DeviceSettingsUpdate(BaseModel):
     
     wifi_ssid: Optional[str] = Field(None, max_length=64)
     wifi_pass: Optional[str] = Field(None, max_length=128)
-    wifi_auth_mode: Optional[int] = None
+    wifi_auth: Optional[int] = None
     device_mode: Optional[int] = None
-    allow_unencrypted_bluetooth: Optional[bool] = None
-    enable_lte: Optional[bool] = None
-    enable_power_management: Optional[bool] = None
+    allow_unencrypted_ble: Optional[bool] = None
+    lte_enabled: Optional[bool] = None
+    ble_enabled: Optional[bool] = None
+    power_management_enabled: Optional[bool] = None
+    pms5003_indoor: Optional[bool] = None
+    pms5003_enabled: Optional[bool] = None
+    bmp280_enabled: Optional[bool] = None
+    dht22_enabled: Optional[bool] = None
+    pms5003_measurement_interval: Optional[int] = Field(None, ge=10, le=86400)
+    bmp280_measurement_interval: Optional[int] = Field(None, ge=10, le=86400)
+    dht22_measurement_interval: Optional[int] = Field(None, ge=10, le=86400)
+    led_brightness: Optional[int] = Field(None, ge=0, le=255)
     sim_pin: Optional[int] = Field(None, ge=0, le=9999)
     bmp280_settings: Optional[int] = None
     measurement_interval_day_sec: Optional[int] = Field(None, ge=10, le=86400)
@@ -138,32 +170,54 @@ class SettingsSyncPayload(BaseModel):
     new_wifi_ssid: Optional[str] = None
     wifi_pass: Optional[str] = None
     new_wifi_pass: Optional[str] = None
-    wifi_auth_mode: int = WifiAuthModeEnum.WPA2_PSK
-    new_wifi_auth_mode: Optional[int] = None
+    wifi_auth: int = WifiAuthModeEnum.WPA2_PSK
+    new_wifi_auth: Optional[int] = None
     
     # Device mode
     device_mode: int = DeviceModeEnum.SETUP
     new_device_mode: Optional[int] = None
     
     # Flags
-    allow_unencrypted_bluetooth: bool = False
-    new_allow_unencrypted_bluetooth: Optional[bool] = None
-    enable_lte: bool = False
-    new_enable_lte: Optional[bool] = None
-    sim_pin_accepted: bool = False
-    enable_power_management: bool = False
-    new_enable_power_management: Optional[bool] = None
+    allow_unencrypted_ble: bool = False
+    new_allow_unencrypted_ble: Optional[bool] = None
+    lte_enabled: bool = False
+    new_lte_enabled: Optional[bool] = None
+    ble_enabled: bool = True
+    new_ble_enabled: Optional[bool] = None
+    power_management_enabled: bool = False
+    new_power_management_enabled: Optional[bool] = None
+    
+    # Sensor flags
+    pms5003_indoor: bool = False
+    new_pms5003_indoor: Optional[bool] = None
+    pms5003_enabled: bool = True
+    new_pms5003_enabled: Optional[bool] = None
+    bmp280_enabled: bool = True
+    new_bmp280_enabled: Optional[bool] = None
+    dht22_enabled: bool = True
+    new_dht22_enabled: Optional[bool] = None
+    
+    # Sensor intervals
+    pms5003_measurement_interval: int = 300
+    new_pms5003_measurement_interval: Optional[int] = None
+    bmp280_measurement_interval: int = 300
+    new_bmp280_measurement_interval: Optional[int] = None
+    dht22_measurement_interval: int = 300
+    new_dht22_measurement_interval: Optional[int] = None
+    
+    # LED
+    led_brightness: int = 100
+    new_led_brightness: Optional[int] = None
     
     # SIM
     sim_pin: Optional[int] = None
     new_sim_pin: Optional[int] = None
-    sim_iccid: Optional[str] = None
     
     # Sensor settings
     bmp280_settings: int = 0
     new_bmp280_settings: Optional[int] = None
     
-    # Measurement intervals
+    # Global measurement intervals
     measurement_interval_day_sec: int = 300
     new_measurement_interval_day_sec: Optional[int] = None
     measurement_interval_night_sec: int = 900
@@ -186,16 +240,25 @@ class DeviceSettingsReport(BaseModel):
     Received via MQTT on topic: settings_report/{device_id}
     
     Device sends this when its settings differ from server's expected values.
+    When received, server updates current values and clears pending.
     """
     wifi_ssid: Optional[str] = None
-    wifi_auth_mode: Optional[int] = None
+    wifi_pass: Optional[str] = None
+    wifi_auth: Optional[int] = None
     device_mode: Optional[int] = None
-    allow_unencrypted_bluetooth: Optional[bool] = None
-    enable_lte: Optional[bool] = None
-    sim_pin_accepted: Optional[bool] = None
-    enable_power_management: Optional[bool] = None
+    allow_unencrypted_ble: Optional[bool] = None
+    lte_enabled: Optional[bool] = None
+    ble_enabled: Optional[bool] = None
+    power_management_enabled: Optional[bool] = None
+    pms5003_indoor: Optional[bool] = None
+    pms5003_enabled: Optional[bool] = None
+    bmp280_enabled: Optional[bool] = None
+    dht22_enabled: Optional[bool] = None
+    pms5003_measurement_interval: Optional[int] = None
+    bmp280_measurement_interval: Optional[int] = None
+    dht22_measurement_interval: Optional[int] = None
+    led_brightness: Optional[int] = None
     sim_pin: Optional[int] = None
-    sim_iccid: Optional[str] = None
     bmp280_settings: Optional[int] = None
     measurement_interval_day_sec: Optional[int] = None
     measurement_interval_night_sec: Optional[int] = None
