@@ -15,6 +15,8 @@ from app_common.database import sessionmanager
 from app_common.models.measurement import Measurement
 from app_common.models.device import Device
 from app_common.models.ownership import Ownership
+from app_common.models.device_settings import DeviceSettings, SettingSyncStatus
+from app_common.models.device_telemetry import DeviceTelemetry
 
 # AWS IoT configuration
 USE_AWS_MQTT = os.getenv("USE_AWS_MQTT", "true").lower() == "true"
@@ -88,6 +90,9 @@ else:
 MQTT_TOPIC_SENSORS = "sensors/#"
 MQTT_TOPIC_STATUS = "status/#"
 MQTT_TOPIC_PRESENCE = "presence/#"
+MQTT_TOPIC_TELEMETRY = "telemetry/#"
+MQTT_TOPIC_SETTINGS_REPORT = "settings_report/#"
+MQTT_TOPIC_SETTINGS_ACK = "settings_ack/#"
 
 # Global MQTT client reference for publishing
 _mqtt_client: Optional[Client] = None
@@ -253,6 +258,8 @@ async def process_presence_message(topic: str, payload: str):
     """
     Przetwarza wiadomość z topic 'presence/<device_id>'
     To są wiadomości LWT (Last Will and Testament) informujące o statusie urządzenia.
+    
+    When device comes online, trigger settings sync.
     """
     try:
         parts = topic.split("/")
@@ -268,6 +275,8 @@ async def process_presence_message(topic: str, payload: str):
             
             if status == "online":
                 logger.info(f"[MQTT] Device {device_id} is ONLINE")
+                # Trigger settings sync when device comes online
+                await send_settings_sync(device_id)
             elif status == "offline":
                 logger.warning(f"[MQTT] Device {device_id} is OFFLINE (reason: {reason})")
             else:
@@ -278,6 +287,303 @@ async def process_presence_message(topic: str, payload: str):
             
     except Exception as e:
         logger.error(f"[MQTT] Error processing presence message: {e!r}")
+
+
+async def process_telemetry_message(topic: str, payload: str):
+    """
+    Przetwarza wiadomość z topic 'telemetry/<device_id>'
+    Zapisuje telemetrię urządzenia do bazy danych.
+    """
+    try:
+        parts = topic.split("/")
+        if len(parts) < 2:
+            logger.warning(f"[MQTT] Invalid telemetry topic format: {topic}")
+            return
+        
+        device_id_str = parts[1]
+        
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as e:
+            logger.error(f"[MQTT] Invalid JSON in telemetry message: {e}")
+            return
+        
+        try:
+            device_id = int(device_id_str)
+        except (ValueError, TypeError):
+            logger.error(f"[MQTT] Invalid device_id in telemetry: {device_id_str}")
+            return
+        
+        await save_telemetry_to_db(device_id, data)
+        
+    except Exception as e:
+        logger.error(f"[MQTT] Error processing telemetry message: {e!r}")
+
+
+async def save_telemetry_to_db(device_id: int, data: dict):
+    """
+    Zapisuje telemetrię urządzenia do bazy danych.
+    """
+    session = None
+    try:
+        session = sessionmanager.session()
+        
+        telemetry = DeviceTelemetry.from_mqtt_payload(device_id, data)
+        session.add(telemetry)
+        await session.commit()
+        
+        logger.info(f"[MQTT] Saved telemetry for device {device_id}")
+        
+    except Exception as e:
+        logger.error(f"[MQTT] Error saving telemetry: {e!r}")
+        if session:
+            await session.rollback()
+    finally:
+        if session:
+            await session.close()
+
+
+async def process_settings_report_message(topic: str, payload: str):
+    """
+    Przetwarza wiadomość z topic 'settings_report/<device_id>'
+    Urządzenie zgłasza swoje aktualne ustawienia gdy różnią się od oczekiwanych.
+    """
+    try:
+        parts = topic.split("/")
+        if len(parts) < 2:
+            return
+        
+        device_id_str = parts[1]
+        
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as e:
+            logger.error(f"[MQTT] Invalid JSON in settings report: {e}")
+            return
+        
+        try:
+            device_id = int(device_id_str)
+        except (ValueError, TypeError):
+            logger.error(f"[MQTT] Invalid device_id in settings report: {device_id_str}")
+            return
+        
+        await update_settings_from_device(device_id, data)
+        
+    except Exception as e:
+        logger.error(f"[MQTT] Error processing settings report: {e!r}")
+
+
+async def update_settings_from_device(device_id: int, data: dict):
+    """
+    Aktualizuje ustawienia w bazie na podstawie raportu urządzenia.
+    Urządzenie wysyła swoje aktualne wartości, gdy różnią się od oczekiwanych.
+    """
+    session = None
+    try:
+        from sqlalchemy import select
+        session = sessionmanager.session()
+        
+        query = select(DeviceSettings).where(DeviceSettings.device_id == device_id)
+        settings = await session.scalar(query)
+        
+        if not settings:
+            logger.warning(f"[MQTT] No settings found for device {device_id}")
+            return
+        
+        # Update current values from device report
+        field_mapping = {
+            "wifi_ssid": "wifi_ssid",
+            "wifi_auth_mode": "wifi_auth_mode",
+            "device_mode": "device_mode",
+            "allow_unencrypted_bluetooth": "allow_unencrypted_bluetooth",
+            "enable_lte": "enable_lte",
+            "sim_pin_accepted": "sim_pin_accepted",
+            "enable_power_management": "enable_power_management",
+            "sim_pin": "sim_pin",
+            "sim_iccid": "sim_iccid",
+            "bmp280_settings": "bmp280_settings",
+            "measurement_interval_day_sec": "measurement_interval_day_sec",
+            "measurement_interval_night_sec": "measurement_interval_night_sec",
+            "daytime_start_sec": "daytime_start_sec",
+            "daytime_end_sec": "daytime_end_sec",
+            "owner_user_id": "owner_user_id",
+        }
+        
+        updated_fields = []
+        for json_field, model_field in field_mapping.items():
+            if json_field in data:
+                setattr(settings, model_field, data[json_field])
+                updated_fields.append(model_field)
+        
+        if updated_fields:
+            settings.last_sync_at = datetime.utcnow()
+            settings.sync_status = SettingSyncStatus.SYNCED
+            await session.commit()
+            logger.info(f"[MQTT] Updated settings for device {device_id}: {updated_fields}")
+        
+    except Exception as e:
+        logger.error(f"[MQTT] Error updating settings from device: {e!r}")
+        if session:
+            await session.rollback()
+    finally:
+        if session:
+            await session.close()
+
+
+async def process_settings_ack_message(topic: str, payload: str):
+    """
+    Przetwarza wiadomość z topic 'settings_ack/<device_id>'
+    Urządzenie potwierdza zastosowanie ustawień.
+    """
+    try:
+        parts = topic.split("/")
+        if len(parts) < 2:
+            return
+        
+        device_id_str = parts[1]
+        
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as e:
+            logger.error(f"[MQTT] Invalid JSON in settings ack: {e}")
+            return
+        
+        try:
+            device_id = int(device_id_str)
+        except (ValueError, TypeError):
+            logger.error(f"[MQTT] Invalid device_id in settings ack: {device_id_str}")
+            return
+        
+        await apply_acknowledged_settings(device_id, data)
+        
+    except Exception as e:
+        logger.error(f"[MQTT] Error processing settings ack: {e!r}")
+
+
+async def apply_acknowledged_settings(device_id: int, data: dict):
+    """
+    Stosuje potwierdzone ustawienia - przesuwa pending do current.
+    """
+    session = None
+    try:
+        from sqlalchemy import select
+        session = sessionmanager.session()
+        
+        query = select(DeviceSettings).where(DeviceSettings.device_id == device_id)
+        settings = await session.scalar(query)
+        
+        if not settings:
+            logger.warning(f"[MQTT] No settings found for device {device_id}")
+            return
+        
+        applied_settings = data.get("applied_settings", [])
+        
+        # Map applied setting names to pending field names
+        pending_field_mapping = {
+            "wifi_ssid": ("wifi_ssid", "wifi_ssid_pending"),
+            "wifi_pass": ("wifi_pass", "wifi_pass_pending"),
+            "wifi_auth_mode": ("wifi_auth_mode", "wifi_auth_mode_pending"),
+            "device_mode": ("device_mode", "device_mode_pending"),
+            "allow_unencrypted_bluetooth": ("allow_unencrypted_bluetooth", "allow_unencrypted_bluetooth_pending"),
+            "enable_lte": ("enable_lte", "enable_lte_pending"),
+            "enable_power_management": ("enable_power_management", "enable_power_management_pending"),
+            "sim_pin": ("sim_pin", "sim_pin_pending"),
+            "bmp280_settings": ("bmp280_settings", "bmp280_settings_pending"),
+            "measurement_interval_day_sec": ("measurement_interval_day_sec", "measurement_interval_day_sec_pending"),
+            "measurement_interval_night_sec": ("measurement_interval_night_sec", "measurement_interval_night_sec_pending"),
+            "daytime_start_sec": ("daytime_start_sec", "daytime_start_sec_pending"),
+            "daytime_end_sec": ("daytime_end_sec", "daytime_end_sec_pending"),
+            "owner_user_id": ("owner_user_id", "owner_user_id_pending"),
+        }
+        
+        updated_fields = []
+        for setting_name in applied_settings:
+            if setting_name in pending_field_mapping:
+                current_field, pending_field = pending_field_mapping[setting_name]
+                pending_value = getattr(settings, pending_field)
+                if pending_value is not None:
+                    setattr(settings, current_field, pending_value)
+                    setattr(settings, pending_field, None)
+                    updated_fields.append(current_field)
+        
+        if updated_fields:
+            settings.last_sync_at = datetime.utcnow()
+            if not settings.has_pending_changes():
+                settings.sync_status = SettingSyncStatus.SYNCED
+            await session.commit()
+            logger.info(f"[MQTT] Applied settings for device {device_id}: {updated_fields}")
+        
+    except Exception as e:
+        logger.error(f"[MQTT] Error applying acknowledged settings: {e!r}")
+        if session:
+            await session.rollback()
+    finally:
+        if session:
+            await session.close()
+
+
+async def send_settings_sync(device_id: str):
+    """
+    Wysyła ustawienia synchronizacji do urządzenia.
+    Wywoływane gdy urządzenie przychodzi online.
+    """
+    session = None
+    try:
+        from sqlalchemy import select
+        session = sessionmanager.session()
+        
+        try:
+            device_id_int = int(device_id)
+        except (ValueError, TypeError):
+            logger.error(f"[MQTT] Invalid device_id for settings sync: {device_id}")
+            return
+        
+        query = select(DeviceSettings).where(DeviceSettings.device_id == device_id_int)
+        settings = await session.scalar(query)
+        
+        if not settings:
+            logger.info(f"[MQTT] No settings found for device {device_id}, creating default")
+            # Create default settings
+            settings = DeviceSettings(device_id=device_id_int)
+            session.add(settings)
+            await session.commit()
+        
+        # Get sync payload
+        sync_payload = settings.get_sync_payload()
+        
+        # Publish to settings_sync topic
+        await publish_settings_sync(device_id, sync_payload)
+        
+        # Update sync status
+        if settings.has_pending_changes():
+            settings.sync_status = SettingSyncStatus.PENDING_TO_DEVICE
+            await session.commit()
+        
+    except Exception as e:
+        logger.error(f"[MQTT] Error sending settings sync: {e!r}")
+        if session:
+            await session.rollback()
+    finally:
+        if session:
+            await session.close()
+
+
+async def publish_settings_sync(device_id: str, payload: dict):
+    """
+    Publikuje ustawienia synchronizacji na topic settings_sync/{device_id}
+    """
+    if _mqtt_client is None:
+        logger.error("[MQTT] Client not connected, cannot publish settings sync")
+        return False
+    
+    try:
+        topic = f"settings_sync/{device_id}"
+        await _mqtt_client.publish(topic, payload=json.dumps(payload))
+        logger.info(f"[MQTT] Sent settings sync to {topic}")
+        return True
+    except Exception as e:
+        logger.error(f"[MQTT] Error publishing settings sync: {e!r}")
+        return False
 
 
 async def process_message(topic: str, payload: str):
@@ -292,6 +598,12 @@ async def process_message(topic: str, payload: str):
         await process_status_message(topic, payload)
     elif topic.startswith("presence/"):
         await process_presence_message(topic, payload)
+    elif topic.startswith("telemetry/"):
+        await process_telemetry_message(topic, payload)
+    elif topic.startswith("settings_report/"):
+        await process_settings_report_message(topic, payload)
+    elif topic.startswith("settings_ack/"):
+        await process_settings_ack_message(topic, payload)
     else:
         logger.warning(f"[MQTT] Unknown topic: {topic}")
 
@@ -340,8 +652,11 @@ async def _mqtt_loop():
         await client.subscribe(MQTT_TOPIC_SENSORS)
         await client.subscribe(MQTT_TOPIC_STATUS)
         await client.subscribe(MQTT_TOPIC_PRESENCE)
+        await client.subscribe(MQTT_TOPIC_TELEMETRY)
+        await client.subscribe(MQTT_TOPIC_SETTINGS_REPORT)
+        await client.subscribe(MQTT_TOPIC_SETTINGS_ACK)
         logger.info(f"[MQTT] Connected to {MQTT_HOST}:{MQTT_PORT}")
-        logger.info(f"[MQTT] Subscribed to {MQTT_TOPIC_SENSORS}, {MQTT_TOPIC_STATUS}, {MQTT_TOPIC_PRESENCE}")
+        logger.info(f"[MQTT] Subscribed to: sensors, status, presence, telemetry, settings_report, settings_ack")
 
         try:
             async for message in client.messages:
