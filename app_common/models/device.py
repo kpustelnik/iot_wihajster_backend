@@ -45,3 +45,19 @@ class Device(Base):
         passive_deletes=True,
         cascade="all, delete"
     )
+    
+    settings = relationship(
+        "DeviceSettings",
+        back_populates="device",
+        uselist=False,  # One-to-one relationship
+        passive_deletes=True,
+        cascade="all, delete"
+    )
+    
+    telemetry = relationship(
+        "DeviceTelemetry",
+        back_populates="device",
+        passive_deletes=True,
+        cascade="all, delete",
+        order_by="desc(DeviceTelemetry.received_at)"
+    )
