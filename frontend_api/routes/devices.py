@@ -504,10 +504,13 @@ async def get_device_sensors_latest(
     if device.user_id != current_user.id and current_user.type != UserType.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this device")
     
-    # Pobierz ostatni pomiar
+    # Pobierz ostatni pomiar (przez aktywny ownership)
+    from app_common.models.ownership import Ownership
     result = await db.execute(
         select(Measurement)
-        .where(Measurement.device_id == device_id)
+        .join(Ownership, Measurement.ownership_id == Ownership.id)
+        .where(Ownership.device_id == device_id)
+        .where(Ownership.is_active == True)
         .order_by(Measurement.time.desc())
         .limit(1)
     )
@@ -565,10 +568,13 @@ async def get_device_sensors_history(
     delta = time_ranges.get(range, timedelta(hours=24))
     since = datetime.utcnow() - delta
     
-    # Pobierz pomiary
+    # Pobierz pomiary (przez aktywny ownership)
+    from app_common.models.ownership import Ownership
     result = await db.execute(
         select(Measurement)
-        .where(Measurement.device_id == device_id)
+        .join(Ownership, Measurement.ownership_id == Ownership.id)
+        .where(Ownership.device_id == device_id)
+        .where(Ownership.is_active == True)
         .where(Measurement.time >= since)
         .order_by(Measurement.time.asc())
         .limit(1000)

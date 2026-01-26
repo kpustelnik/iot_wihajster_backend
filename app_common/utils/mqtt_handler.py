@@ -9,9 +9,12 @@ from typing import Optional
 from aiomqtt import Client, MqttError
 from decimal import Decimal
 
+from sqlalchemy import select, and_
+
 from app_common.database import sessionmanager
 from app_common.models.measurement import Measurement
 from app_common.models.device import Device
+from app_common.models.ownership import Ownership
 
 # AWS IoT configuration
 USE_AWS_MQTT = os.getenv("USE_AWS_MQTT", "true").lower() == "true"
@@ -90,6 +93,18 @@ MQTT_TOPIC_PRESENCE = "presence/#"
 _mqtt_client: Optional[Client] = None
 
 
+async def get_active_ownership(session, device_id: int) -> Ownership | None:
+    """Pobiera aktywny ownership dla urządzenia"""
+    query = select(Ownership).where(
+        and_(
+            Ownership.device_id == device_id,
+            Ownership.is_active == True
+        )
+    )
+    result = await session.execute(query)
+    return result.scalar_one_or_none()
+
+
 async def save_sensor_data_to_db(device_id: int, data: dict):
     """
     Zapisuje dane z sensorów do bazy danych.
@@ -105,8 +120,15 @@ async def save_sensor_data_to_db(device_id: int, data: dict):
         "device_id": "1"
     }
     """
+    session = None
     try:
         session = sessionmanager.session()
+        
+        # Get active ownership for device
+        ownership = await get_active_ownership(session, device_id)
+        if ownership is None:
+            logger.warning(f"[MQTT] No active ownership found for device {device_id}, skipping measurement")
+            return
         
         # Parse timestamp
         timestamp = data.get("timestamp")
@@ -133,7 +155,7 @@ async def save_sensor_data_to_db(device_id: int, data: dict):
         
         # Create measurement record
         measurement = Measurement(
-            device_id=device_id,
+            ownership_id=ownership.id,
             time=measurement_time,
             temperature=temperature,
             humidity=humidity,
