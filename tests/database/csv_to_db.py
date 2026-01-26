@@ -63,6 +63,9 @@ for name, filename, tableName, modelName in zip(filenames, files, tableNames, mo
                 model = locals()[modelName]
                 # remove id so postgres seq won't be behind
                 values = model.model_validate(attributes).model_dump()
+                # Filter out keys that are not columns in the table
+                table_columns = {c.name for c in table.__table__.columns}
+                values = {k: v for k, v in values.items() if k in table_columns}
                 entry = table(**values)
             else:  # if model does not exist we do it raw
                 for v in table.__table__.c:
