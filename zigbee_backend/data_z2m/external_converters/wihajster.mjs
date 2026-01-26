@@ -93,6 +93,169 @@ export default {
             description: "Measured PM10.0 (particulate matter) concentration",
             unit: "µg/m³",
             access: "STATE_GET"
+        }),
+
+        // Diagnostic attributes
+        m.numeric({
+            name: "crash_count",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0007, type: Zcl.DataType.UINT16},
+            description: "Number of device crashes",
+            access: "STATE_GET"
+        }),
+
+        m.binary({
+            name: "allow_not_encrypted_ble",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0008, type: Zcl.DataType.BOOLEAN},
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            description: "Allow non-encrypted BLE connections",
+            access: "ALL"
+        }),
+
+        m.binary({
+            name: "enable_power_management",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0009, type: Zcl.DataType.BOOLEAN},
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            description: "Enable power management features",
+            access: "ALL"
+        }),
+
+        // Sensor configuration attributes
+        m.numeric({
+            name: "bmp280_settings",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0030, type: Zcl.DataType.UINT8},
+            description: "BMP280 sensor settings",
+            access: "ALL"
+        }),
+
+        m.binary({
+            name: "pms5003_indoor",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0031, type: Zcl.DataType.BOOLEAN},
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            description: "PMS5003 indoor mode",
+            access: "ALL"
+        }),
+
+        m.numeric({
+            name: "pms5003_measurement_interval",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0032, type: Zcl.DataType.UINT32},
+            description: "PMS5003 measurement interval in seconds",
+            unit: "s",
+            access: "ALL"
+        }),
+
+        m.binary({
+            name: "enable_pms5003",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0033, type: Zcl.DataType.BOOLEAN},
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            description: "Enable PMS5003 sensor",
+            access: "ALL"
+        }),
+
+        m.numeric({
+            name: "bmp280_measurement_interval",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0034, type: Zcl.DataType.UINT32},
+            description: "BMP280 measurement interval in seconds",
+            unit: "s",
+            access: "ALL"
+        }),
+
+        m.binary({
+            name: "enable_bmp280",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0035, type: Zcl.DataType.BOOLEAN},
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            description: "Enable BMP280 sensor",
+            access: "ALL"
+        }),
+
+        m.numeric({
+            name: "dht22_measurement_interval",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0036, type: Zcl.DataType.UINT32},
+            description: "DHT22 measurement interval in seconds",
+            unit: "s",
+            access: "ALL"
+        }),
+
+        m.binary({
+            name: "enable_dht22",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0037, type: Zcl.DataType.BOOLEAN},
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            description: "Enable DHT22 sensor",
+            access: "ALL"
+        }),
+
+        // Measurement scheduling attributes
+        m.numeric({
+            name: "measurement_interval_day",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0051, type: Zcl.DataType.UINT32},
+            description: "Measurement interval during daytime in seconds",
+            unit: "s",
+            access: "ALL"
+        }),
+
+        m.numeric({
+            name: "measurement_interval_night",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0052, type: Zcl.DataType.UINT32},
+            description: "Measurement interval during nighttime in seconds",
+            unit: "s",
+            access: "ALL"
+        }),
+
+        m.numeric({
+            name: "daytime_start",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0061, type: Zcl.DataType.UINT32},
+            description: "Daytime start time (seconds from midnight)",
+            unit: "s",
+            access: "ALL"
+        }),
+
+        m.numeric({
+            name: "daytime_end",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0062, type: Zcl.DataType.UINT32},
+            description: "Daytime end time (seconds from midnight)",
+            unit: "s",
+            access: "ALL"
+        }),
+
+        // BLE and LED attributes
+        m.binary({
+            name: "enable_ble",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x00A1, type: Zcl.DataType.BOOLEAN},
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            description: "Enable BLE functionality",
+            access: "ALL"
+        }),
+
+        m.numeric({
+            name: "led_brightness",
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x00A2, type: Zcl.DataType.UINT8},
+            description: "LED brightness level (0-255)",
+            valueMin: 0,
+            valueMax: 255,
+            access: "ALL"
         })
     ],
     meta: {},
