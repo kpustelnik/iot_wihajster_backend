@@ -178,7 +178,7 @@ export default {
             voltage: true,
             lowStatus: false,
             percentageReporting: true,
-            voltageReporting: false,
+            voltageReporting: true,
             dontDividePercentage: false
         }),
 
