@@ -22,6 +22,8 @@ export default function DeviceManagementSensors({ server }: {
 
   const [batteryVoltage, setBatteryVoltage] = React.useState<number | null>(null);
   const [batteryPercent, setBatteryPercent] = React.useState<number | null>(null);
+  const [gpsLatitude, setGpsLatitude] = React.useState<number | null>(null);
+  const [gpsLongitude, setGpsLongitude] = React.useState<number | null>(null);
 
   const [allLoaded, setAllLoaded] = React.useState(false);
 
@@ -111,6 +113,29 @@ export default function DeviceManagementSensors({ server }: {
       await bluetoothQueueContext.enqueue(() => batteryPercentCharacteristic.startNotifications());
       await bluetoothQueueContext.enqueue(() => batteryPercentCharacteristic.readValue());
 
+      // GPS coordinates - may not be available on all devices
+      try {
+        const gpsLatitudeCharacteristic = await bluetoothQueueContext.enqueue(() => sensorsService.getCharacteristic(BLECharacteristicEnum.GPS_LATITUDE));
+        gpsLatitudeCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+          const target = event.target as BluetoothRemoteGATTCharacteristic;
+          const value = target.value;
+          if (value) setGpsLatitude(value.getFloat32(0, true));
+        });
+        await bluetoothQueueContext.enqueue(() => gpsLatitudeCharacteristic.startNotifications());
+        await bluetoothQueueContext.enqueue(() => gpsLatitudeCharacteristic.readValue());
+
+        const gpsLongitudeCharacteristic = await bluetoothQueueContext.enqueue(() => sensorsService.getCharacteristic(BLECharacteristicEnum.GPS_LONGITUDE));
+        gpsLongitudeCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+          const target = event.target as BluetoothRemoteGATTCharacteristic;
+          const value = target.value;
+          if (value) setGpsLongitude(value.getFloat32(0, true));
+        });
+        await bluetoothQueueContext.enqueue(() => gpsLongitudeCharacteristic.startNotifications());
+        await bluetoothQueueContext.enqueue(() => gpsLongitudeCharacteristic.readValue());
+      } catch (e) {
+        console.log('GPS characteristics not available:', e);
+      }
+
       setAllLoaded(true);
       // TODO: Remove event listeners on unmount
     })();
@@ -160,6 +185,9 @@ export default function DeviceManagementSensors({ server }: {
             ) : null }
             { (batteryPercent !== null) ? (
               <Typography>Battery Percent: {batteryPercent.toFixed(2)} %</Typography>
+            ) : null }
+            { (gpsLatitude !== null && gpsLongitude !== null) ? (
+              <Typography>📍 Location: {gpsLatitude.toFixed(6)}°, {gpsLongitude.toFixed(6)}°</Typography>
             ) : null }
 
             {/* Settings section */}

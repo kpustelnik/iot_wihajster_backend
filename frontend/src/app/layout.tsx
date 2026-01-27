@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import styles from "./page.module.css";
 import "./globals.css";
 
 import BluetoothQueueProvider from "@/components/BluetoothQueueProvider";
@@ -35,13 +34,7 @@ export default function RootLayout({
           <MuiThemeWrapper>
             <SnackbarProvider>
               <BluetoothQueueProvider>
-                <div className={styles.page}>
-                  <main className={styles.main}>
-                    {children}
-                  </main>
-                  <footer className={styles.footer}>
-                  </footer>
-                </div>
+                {children}
               </BluetoothQueueProvider>
             </SnackbarProvider>
           </MuiThemeWrapper>

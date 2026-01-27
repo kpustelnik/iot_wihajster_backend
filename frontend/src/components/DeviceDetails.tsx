@@ -444,6 +444,16 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                             </Grid>
                             <Grid size={{ xs: 6, sm: 4 }}>
                                 <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" display="block" sx={{ mb: 0.5 }}>📍 Lokalizacja</Typography>
+                                    <Typography variant="h6" fontWeight={500} sx={{ fontSize: '0.9rem' }}>
+                                        {latestReading.latitude !== null && latestReading.longitude !== null 
+                                            ? `${latestReading.latitude.toFixed(4)}°, ${latestReading.longitude.toFixed(4)}°`
+                                            : '—'}
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 4 }}>
+                                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                                     <Typography variant="body2" color="text.secondary" display="block" sx={{ mb: 0.5 }}>🕐 Ostatni odczyt</Typography>
                                     <Typography variant="h6" fontWeight={500}>
                                         {latestReading.timestamp ? new Date(latestReading.timestamp).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : '—'}
