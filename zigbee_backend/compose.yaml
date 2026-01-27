@@ -3,9 +3,8 @@ services:
     zigbee2mqtt:
         container_name: zigbee2mqtt
         hostname: zigbee2mqtt
-        image: koenkk/zigbee2mqtt:latest-dev
+        image: koenkk/zigbee2mqtt:latest
         restart: unless-stopped
-        network_mode: host
         privileged: true
         depends_on:
             - mqtt_ha
@@ -20,8 +19,8 @@ services:
         image: eclipse-mosquitto
         container_name: mqtt_ha
         hostname: mqtt_ha
-        #ports:
-        #    - "1883:1883" #default mqtt port
+        ports:
+            - "1883:1883" #default mqtt port
         #    - "9001:9001" #default mqtt port for websockets
         volumes:
             - ./mqtt_ha/config:/mosquitto/config:rw

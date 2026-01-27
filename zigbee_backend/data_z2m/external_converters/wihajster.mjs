@@ -53,7 +53,6 @@ export default {
             unit: "°C",
             scale: 100,
             access: "STATE_GET",
-            ...args,
         }),
 
         m.battery({
@@ -124,12 +123,78 @@ export default {
             access: "ALL"
         }),
 
-        // Sensor configuration attributes
-        m.numeric({
-            name: "bmp280_settings",
+        // BMP280 sensor configuration attributes
+        m.enumLookup({
+            name: "bmp280_mode",
+            lookup: {sleep: 0b00, forced: 0b01, normal: 0b11},
             cluster: "manuSpecificWihajster",
             attribute: {ID: 0x0030, type: Zcl.DataType.UINT8},
-            description: "BMP280 sensor settings",
+            description: "BMP280 operating mode",
+            access: "ALL"
+        }),
+
+        m.enumLookup({
+            name: "bmp280_standby_time",
+            lookup: {
+                "0.5ms": 0b000,
+                "62.5ms": 0b001,
+                "125ms": 0b010,
+                "250ms": 0b011,
+                "500ms": 0b100,
+                "1000ms": 0b101,
+                "2000ms": 0b110,
+                "4000ms": 0b111
+            },
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0038, type: Zcl.DataType.UINT8},
+            description: "BMP280 standby time between measurements in normal mode",
+            access: "ALL"
+        }),
+
+        m.enumLookup({
+            name: "bmp280_filter",
+            lookup: {
+                off: 0b000,
+                "2": 0b001,
+                "4": 0b010,
+                "8": 0b011,
+                "16": 0b100
+            },
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x0039, type: Zcl.DataType.UINT8},
+            description: "BMP280 IIR filter coefficient",
+            access: "ALL"
+        }),
+
+        m.enumLookup({
+            name: "bmp280_temp_oversampling",
+            lookup: {
+                disabled: 0b000,
+                x1: 0b001,
+                x2: 0b010,
+                x4: 0b011,
+                x8: 0b100,
+                x16: 0b101
+            },
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x003A, type: Zcl.DataType.UINT8},
+            description: "BMP280 temperature oversampling mode",
+            access: "ALL"
+        }),
+
+        m.enumLookup({
+            name: "bmp280_pressure_oversampling",
+            lookup: {
+                disabled: 0b000,
+                x1: 0b001,
+                x2: 0b010,
+                x4: 0b011,
+                x8: 0b100,
+                x16: 0b101
+            },
+            cluster: "manuSpecificWihajster",
+            attribute: {ID: 0x003B, type: Zcl.DataType.UINT8},
+            description: "BMP280 pressure oversampling mode",
             access: "ALL"
         }),
 
