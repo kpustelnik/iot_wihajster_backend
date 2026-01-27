@@ -58,6 +58,8 @@ export default function DeviceConnector({
     if (isConnecting) return;
 
     setIsConnecting(true);
+    // Reset binding status for new connection attempt
+    setBindingStatus(null);
     
     try {
       const device: BluetoothDevice | null = await navigator.bluetooth.requestDevice({
@@ -99,6 +101,8 @@ export default function DeviceConnector({
       const isEncrypted = encryptedValue.getUint8(0) === 1;
       if (isEncrypted) {
         setStep(6);
+        // Connection was already secured - device was bound previously, don't show binding message
+        setBindingStatus(-1); // -1 = already connected, no binding message needed
         showSuccess('Connection already secured!');
         if (onDeviceConnected) {
           onDeviceConnected();
@@ -258,6 +262,11 @@ export default function DeviceConnector({
         {bindingStatus === 0 && (
           <Alert severity="info" sx={{ mt: 1 }}>
             Device was already bound to your account.
+          </Alert>
+        )}
+        {bindingStatus === -1 && (
+          <Alert severity="info" sx={{ mt: 1 }}>
+            Connection restored - device is ready.
           </Alert>
         )}
         <Button variant="contained" sx={{ mt: 1 }} onClick={() => setSettingsOpen(true)}>Manage the device</Button>
