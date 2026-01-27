@@ -12,7 +12,7 @@ import logging
 from app_common.database import get_db
 from app_common.models.user import UserType, User
 from app_common.models.device import Device, SettingsStatus
-from app_common.utils.mqtt_handler import publish_command
+from app_common.utils.mqtt_handler import publish_command, send_command_and_wait
 from frontend_api.docs import Tags
 from frontend_api.utils.auth.auth import RequireUser
 
@@ -502,7 +502,7 @@ async def get_device_status(
     current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Pobierz status urządzenia."""
+    """Pobierz status urządzenia (fire-and-forget)."""
     await verify_device_ownership(db, cmd.device_id, current_user)
     
     success = await publish_command(str(cmd.device_id), "get_status", {})
@@ -511,6 +511,102 @@ async def get_device_status(
         success=success,
         message="Status request sent" if success else "Failed to send command",
         device_id=cmd.device_id
+    )
+
+
+class SyncCommandRequest(CommandRequest):
+    """Request for synchronous command that waits for response"""
+    timeout: float = Field(default=10.0, ge=1.0, le=60.0, description="Timeout in seconds")
+
+
+class SyncCommandResponse(BaseModel):
+    """Response from synchronous command"""
+    success: bool
+    message: str
+    device_id: int
+    response: Optional[Dict[str, Any]] = None
+
+
+@router.post(
+    "/device/status/sync",
+    response_model=SyncCommandResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get device status (synchronous)",
+)
+async def get_device_status_sync(
+    cmd: SyncCommandRequest,
+    current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Pobierz status urządzenia i czekaj na odpowiedź.
+    Timeout domyślnie 10 sekund.
+    """
+    await verify_device_ownership(db, cmd.device_id, current_user)
+    
+    response = await send_command_and_wait(
+        str(cmd.device_id), 
+        "get_status", 
+        {}, 
+        timeout=cmd.timeout
+    )
+    
+    if response is None:
+        return SyncCommandResponse(
+            success=False,
+            message="Device did not respond within timeout",
+            device_id=cmd.device_id,
+            response=None
+        )
+    
+    return SyncCommandResponse(
+        success=True,
+        message="Status received",
+        device_id=cmd.device_id,
+        response=response
+    )
+
+
+@router.post(
+    "/device/settings/sync",
+    response_model=SyncCommandResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Sync device settings (synchronous)",
+)
+async def sync_device_settings(
+    cmd: SyncCommandRequest,
+    current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Synchronizuj ustawienia z urządzeniem i czekaj na odpowiedź.
+    Urządzenie zwróci aktualne ustawienia lub zastosuje nowe.
+    """
+    from app_common.utils.mqtt_handler import send_settings_sync
+    
+    await verify_device_ownership(db, cmd.device_id, current_user)
+    
+    # Send config_sync command and wait for response
+    response = await send_command_and_wait(
+        str(cmd.device_id),
+        "config_sync",
+        {},  # Device will be sent current backend settings
+        timeout=cmd.timeout
+    )
+    
+    if response is None:
+        return SyncCommandResponse(
+            success=False,
+            message="Device did not respond within timeout",
+            device_id=cmd.device_id,
+            response=None
+        )
+    
+    return SyncCommandResponse(
+        success=True,
+        message=f"Settings sync: {response.get('status', 'unknown')}",
+        device_id=cmd.device_id,
+        response=response
     )
 
 

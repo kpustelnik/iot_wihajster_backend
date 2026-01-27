@@ -91,11 +91,17 @@ MQTT_TOPIC_SENSORS = "sensors/#"
 MQTT_TOPIC_STATUS = "status/#"
 MQTT_TOPIC_PRESENCE = "presence/#"
 MQTT_TOPIC_TELEMETRY = "telemetry/#"
+MQTT_TOPIC_CONFIG = "config/#"  # Device config sync responses
 MQTT_TOPIC_SETTINGS_REPORT = "settings_report/#"
 MQTT_TOPIC_SETTINGS_ACK = "settings_ack/#"
 
 # Global MQTT client reference for publishing
 _mqtt_client: Optional[Client] = None
+
+# Pending command responses for synchronous API
+# Key: (device_id, command_type), Value: asyncio.Future
+_pending_responses: dict[tuple[str, str], asyncio.Future] = {}
+_response_lock = asyncio.Lock()
 
 
 async def get_active_ownership(session, device_id: int) -> Ownership | None:
@@ -511,7 +517,8 @@ async def apply_acknowledged_settings(device_id: int, data: dict):
 async def send_settings_sync(device_id: str):
     """
     Wysyła ustawienia synchronizacji do urządzenia.
-    Wywoływane gdy urządzenie przychodzi online.
+    Używa komendy config_sync na topic data_update/{device_id}.
+    Urządzenie odpowie na topic config/{device_id}.
     """
     session = None
     try:
@@ -522,31 +529,132 @@ async def send_settings_sync(device_id: str):
             device_id_int = int(device_id)
         except (ValueError, TypeError):
             logger.error(f"[MQTT] Invalid device_id for settings sync: {device_id}")
-            return
+            return False
         
         query = select(DeviceSettings).where(DeviceSettings.device_id == device_id_int)
         settings = await session.scalar(query)
         
         if not settings:
             logger.info(f"[MQTT] No settings found for device {device_id}, creating default")
-            # Create default settings
             settings = DeviceSettings(device_id=device_id_int)
             session.add(settings)
             await session.commit()
         
-        # Get sync payload
+        # Get sync payload (current settings from backend)
         sync_payload = settings.get_sync_payload()
         
-        # Publish to settings_sync topic
-        await publish_settings_sync(device_id, sync_payload)
+        # Send config_sync command via data_update topic
+        # The device expects: {"command": "config_sync", "params": {"current": {...}}}
+        success = await publish_command(
+            device_id, 
+            "config_sync", 
+            {"current": sync_payload}
+        )
         
-        # Update sync status
-        if settings.has_pending_changes():
-            settings.sync_status = SettingSyncStatus.PENDING_TO_DEVICE
-            await session.commit()
+        if success:
+            # Update sync status
+            if settings.has_pending_changes():
+                settings.sync_status = SettingSyncStatus.PENDING_TO_DEVICE
+                await session.commit()
+            logger.info(f"[MQTT] Sent config_sync command to device {device_id}")
+        
+        return success
         
     except Exception as e:
         logger.error(f"[MQTT] Error sending settings sync: {e!r}")
+        if session:
+            await session.rollback()
+        return False
+    finally:
+        if session:
+            await session.close()
+
+
+async def process_config_response_message(topic: str, payload: str):
+    """
+    Przetwarza odpowiedzi konfiguracyjne z urządzenia.
+    Urządzenie publikuje na topic 'config/<device_id>' w odpowiedzi na config_sync.
+    """
+    try:
+        parts = topic.split("/")
+        if len(parts) < 2:
+            logger.warning(f"[MQTT] Invalid config topic format: {topic}")
+            return
+        
+        device_id = parts[1]
+        
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as e:
+            logger.error(f"[MQTT] Invalid JSON in config response: {e}")
+            return
+        
+        command = data.get("command", "")
+        
+        # Handle config_sync_response
+        if command == "config_sync_response":
+            status = data.get("status", "unknown")
+            logger.info(f"[MQTT] Config sync response from device {device_id}: {status}")
+            
+            if status == "mismatch":
+                # Device has different values - update backend with device values
+                device_values = data.get("device_values", {})
+                if device_values:
+                    await apply_device_config_to_backend(device_id, device_values)
+            elif status == "updated":
+                # Device applied our settings - mark as synced
+                await mark_settings_synced(device_id)
+            elif status == "in_sync":
+                # Already in sync
+                await mark_settings_synced(device_id)
+            
+            # Resolve any pending futures for synchronous API
+            await _resolve_pending_response(device_id, "config_sync", data)
+        
+        elif command == "get_config_response":
+            # Device sent its current config
+            config = data.get("config", {})
+            logger.info(f"[MQTT] Received config from device {device_id}")
+            await _resolve_pending_response(device_id, "get_config", data)
+            
+    except Exception as e:
+        logger.error(f"[MQTT] Error processing config response: {e!r}")
+
+
+async def apply_device_config_to_backend(device_id: str, device_values: dict):
+    """
+    Aktualizuje ustawienia w backendzie na podstawie wartości z urządzenia.
+    Wywoływane gdy urządzenie zgłasza mismatch podczas sync.
+    """
+    session = None
+    try:
+        session = sessionmanager.session()
+        
+        device_id_int = int(device_id)
+        query = select(DeviceSettings).where(DeviceSettings.device_id == device_id_int)
+        settings = await session.scalar(query)
+        
+        if not settings:
+            return
+        
+        # Apply device values to current settings (not pending)
+        updated_fields = []
+        for current_field, pending_field, json_key in DeviceSettings.SETTING_FIELDS:
+            if json_key in device_values:
+                setattr(settings, current_field, device_values[json_key])
+                # Clear pending if it matches device value
+                if getattr(settings, pending_field) == device_values[json_key]:
+                    setattr(settings, pending_field, None)
+                updated_fields.append(json_key)
+        
+        if updated_fields:
+            settings.sync_status = SettingSyncStatus.SYNCED
+            settings.last_sync = datetime.utcnow()
+            await session.commit()
+            logger.info(f"[MQTT] Applied device config for {device_id}: {updated_fields}")
+            
+    except Exception as e:
+        logger.error(f"[MQTT] Error applying device config: {e!r}")
         if session:
             await session.rollback()
     finally:
@@ -554,22 +662,87 @@ async def send_settings_sync(device_id: str):
             await session.close()
 
 
-async def publish_settings_sync(device_id: str, payload: dict):
+async def mark_settings_synced(device_id: str):
+    """Oznacza ustawienia jako zsynchronizowane."""
+    session = None
+    try:
+        session = sessionmanager.session()
+        
+        device_id_int = int(device_id)
+        query = select(DeviceSettings).where(DeviceSettings.device_id == device_id_int)
+        settings = await session.scalar(query)
+        
+        if settings:
+            settings.sync_status = SettingSyncStatus.SYNCED
+            settings.last_sync = datetime.utcnow()
+            settings.clear_all_pending()
+            await session.commit()
+            logger.info(f"[MQTT] Settings synced for device {device_id}")
+            
+    except Exception as e:
+        logger.error(f"[MQTT] Error marking settings synced: {e!r}")
+        if session:
+            await session.rollback()
+    finally:
+        if session:
+            await session.close()
+
+
+async def _resolve_pending_response(device_id: str, command_type: str, response: dict):
+    """Resolve a pending future for synchronous command API."""
+    async with _response_lock:
+        key = (device_id, command_type)
+        if key in _pending_responses:
+            future = _pending_responses.pop(key)
+            if not future.done():
+                future.set_result(response)
+
+
+async def send_command_and_wait(
+    device_id: str, 
+    command: str, 
+    params: dict = None,
+    timeout: float = 10.0
+) -> dict | None:
     """
-    Publikuje ustawienia synchronizacji na topic settings_sync/{device_id}
+    Wysyła komendę do urządzenia i czeka na odpowiedź.
+    
+    Args:
+        device_id: ID urządzenia
+        command: Nazwa komendy
+        params: Parametry komendy
+        timeout: Timeout w sekundach
+        
+    Returns:
+        Odpowiedź z urządzenia lub None jeśli timeout
     """
-    if _mqtt_client is None:
-        logger.error("[MQTT] Client not connected, cannot publish settings sync")
-        return False
+    # Create a future for the response
+    loop = asyncio.get_event_loop()
+    future = loop.create_future()
+    
+    key = (device_id, command)
+    
+    async with _response_lock:
+        _pending_responses[key] = future
     
     try:
-        topic = f"settings_sync/{device_id}"
-        await _mqtt_client.publish(topic, payload=json.dumps(payload))
-        logger.info(f"[MQTT] Sent settings sync to {topic}")
-        return True
-    except Exception as e:
-        logger.error(f"[MQTT] Error publishing settings sync: {e!r}")
-        return False
+        # Send the command
+        success = await publish_command(device_id, command, params)
+        if not success:
+            return None
+        
+        # Wait for response with timeout
+        try:
+            response = await asyncio.wait_for(future, timeout=timeout)
+            return response
+        except asyncio.TimeoutError:
+            logger.warning(f"[MQTT] Timeout waiting for response to {command} from device {device_id}")
+            return None
+            
+    finally:
+        # Clean up the pending response entry
+        async with _response_lock:
+            _pending_responses.pop(key, None)
 
 
 async def process_message(topic: str, payload: str):
@@ -586,6 +759,8 @@ async def process_message(topic: str, payload: str):
         await process_presence_message(topic, payload)
     elif topic.startswith("telemetry/"):
         await process_telemetry_message(topic, payload)
+    elif topic.startswith("config/"):
+        await process_config_response_message(topic, payload)
     elif topic.startswith("settings_report/"):
         await process_settings_report_message(topic, payload)
     elif topic.startswith("settings_ack/"):
@@ -639,10 +814,11 @@ async def _mqtt_loop():
         await client.subscribe(MQTT_TOPIC_STATUS)
         await client.subscribe(MQTT_TOPIC_PRESENCE)
         await client.subscribe(MQTT_TOPIC_TELEMETRY)
+        await client.subscribe(MQTT_TOPIC_CONFIG)
         await client.subscribe(MQTT_TOPIC_SETTINGS_REPORT)
         await client.subscribe(MQTT_TOPIC_SETTINGS_ACK)
         logger.info(f"[MQTT] Connected to {MQTT_HOST}:{MQTT_PORT}")
-        logger.info(f"[MQTT] Subscribed to: sensors, status, presence, telemetry, settings_report, settings_ack")
+        logger.info(f"[MQTT] Subscribed to: sensors, status, presence, telemetry, config, settings_report, settings_ack")
 
         try:
             async for message in client.messages:

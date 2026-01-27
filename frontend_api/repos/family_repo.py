@@ -71,7 +71,7 @@ async def add_member(
     main_user = await db.scalar(query)
     if main_user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant add member to this family fucker"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cannot add member to this family"
         )
 
     query = select(Family).where(Family.id == family_id)
@@ -119,7 +119,7 @@ async def delete_member(
     main_user = await db.scalar(query)
     if main_user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant delete member from this family fucker"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cannot remove member from this family"
         )
     
     query = select(Family).where(Family.id == family_id)
@@ -165,7 +165,7 @@ async def delete_family(
     main_user = await db.scalar(query)
     if main_user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cant delete this family fucker"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="You cannot delete this family"
         )
     
     query = select(Family).where(Family.id == family_id)

@@ -241,22 +241,22 @@ export default function Map({ isSidebarVisible, isLeftSidebarVisible, onSelectDe
                                     📡 Urządzenie #{device.id}
                                 </Typography>
                                 <Stack spacing={0.5} sx={{ mt: 1 }}>
-                                    {device.temperature !== null && (
+                                    {device.temperature != null && (
                                         <Typography variant="body2">
                                             🌡️ Temperatura: <strong>{device.temperature.toFixed(1)}°C</strong>
                                         </Typography>
                                     )}
-                                    {device.humidity !== null && (
+                                    {device.humidity != null && (
                                         <Typography variant="body2">
                                             💧 Wilgotność: <strong>{device.humidity}%</strong>
                                         </Typography>
                                     )}
-                                    {device.pressure !== null && (
+                                    {device.pressure != null && (
                                         <Typography variant="body2">
                                             🔵 Ciśnienie: <strong>{(device.pressure / 100).toFixed(0)} hPa</strong>
                                         </Typography>
                                     )}
-                                    {device.pm2_5 !== null && (
+                                    {device.pm2_5 != null && (
                                         <Stack direction="row" alignItems="center" spacing={0.5}>
                                             <Typography variant="body2">PM2.5:</Typography>
                                             <Chip 
@@ -266,7 +266,7 @@ export default function Map({ isSidebarVisible, isLeftSidebarVisible, onSelectDe
                                             />
                                         </Stack>
                                     )}
-                                    {device.battery !== null && (
+                                    {device.battery != null && (
                                         <Typography variant="body2">
                                             🔋 Bateria: <strong>{device.battery}%</strong>
                                         </Typography>
