@@ -81,6 +81,11 @@ export default function MapPage() {
         setRefreshKey(prev => prev + 1);
     }, []);
 
+    const handleDeviceFromMap = useCallback((device: DeviceModel) => {
+        // Navigate to device details page with graphs
+        router.push(`/device/${device.id}`);
+    }, [router]);
+
     // Show loading state while checking authentication
     if (isAuthenticated === null) {
         return (
@@ -110,6 +115,7 @@ export default function MapPage() {
             <Map
                 isSidebarVisible={isSidebarVisible}
                 isLeftSidebarVisible={isSidebarVisible}
+                onSelectDevice={handleDeviceFromMap}
             />
             <LeftSidebar
                 key={refreshKey}

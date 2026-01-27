@@ -42,8 +42,11 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { measurementsApi, devicesApi } from '@/lib/api';
 import * as controlApi from '@/lib/api/control';
+import * as firmwareApi from '@/lib/api/firmware';
 import type { MeasurementModel, DeviceModel } from '@/lib/api/schemas';
 import { Timescale } from '@/lib/api/schemas';
 
@@ -86,6 +89,55 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
     const [bmp280Filter, setBmp280Filter] = useState(2);  // filter coefficient 4
     const [bmp280Standby, setBmp280Standby] = useState(0);  // 0.5ms standby
 
+    // OTA state
+    const [otaExpanded, setOtaExpanded] = useState(false);
+    const [firmwareList, setFirmwareList] = useState<firmwareApi.FirmwareInfo[]>([]);
+    const [selectedFirmware, setSelectedFirmware] = useState<string>('');
+    const [otaLoading, setOtaLoading] = useState(false);
+    const [updateAvailable, setUpdateAvailable] = useState<firmwareApi.UpdateCheckResponse | null>(null);
+
+    const fetchFirmwareList = async () => {
+        try {
+            const response = await firmwareApi.listFirmware();
+            setFirmwareList(response.firmwares || []);
+            if (response.firmwares?.length > 0) {
+                setSelectedFirmware(response.firmwares[0].version);
+            }
+        } catch (error) {
+            console.error('Failed to fetch firmware list:', error);
+        }
+    };
+
+    const checkForUpdates = async () => {
+        try {
+            // Try to get latest firmware to show available update
+            const latest = await firmwareApi.getLatestFirmware('esp32c6');
+            if (latest) {
+                setUpdateAvailable({
+                    update_available: true,
+                    current_version: 'unknown',
+                    latest_version: latest.version,
+                    latest_info: latest
+                });
+            }
+        } catch (error) {
+            console.error('Failed to check for updates:', error);
+        }
+    };
+
+    const handleDeployFirmware = async () => {
+        if (!selectedFirmware) return;
+        setOtaLoading(true);
+        try {
+            const result = await firmwareApi.deployFirmware(device.id, selectedFirmware);
+            showCommandResult(result.success, `Aktualizacja OTA rozpoczęta: ${selectedFirmware}`);
+        } catch {
+            showCommandResult(false, 'Błąd rozpoczynania aktualizacji OTA');
+        } finally {
+            setOtaLoading(false);
+        }
+    };
+
     const fetchLatestReading = async () => {
         try {
             const data = await devicesApi.getLatestSensors(device.id);
@@ -114,6 +166,8 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
     useEffect(() => {
         fetchLatestReading();
         fetchMeasurements();
+        fetchFirmwareList();
+        checkForUpdates();
         
         // Auto-refresh latest reading every 30 seconds
         const interval = setInterval(fetchLatestReading, 30000);
@@ -856,6 +910,86 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 <CircularProgress size={24} />
                             </Box>
                         )}
+                    </Collapse>
+                </CardContent>
+            </Card>
+
+            {/* OTA Firmware Update Card */}
+            <Card sx={{ mt: 3 }}>
+                <CardContent>
+                    <Stack 
+                        direction="row" 
+                        alignItems="center" 
+                        justifyContent="space-between"
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => setOtaExpanded(!otaExpanded)}
+                    >
+                        <Typography variant="h6">
+                            <SystemUpdateAltIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                            Aktualizacja firmware (OTA)
+                        </Typography>
+                        <IconButton size="small">
+                            {otaExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        </IconButton>
+                    </Stack>
+                    
+                    {updateAvailable?.update_available && (
+                        <Alert severity="info" sx={{ mt: 2 }}>
+                            Najnowsza dostępna wersja firmware: <strong>{updateAvailable.latest_version}</strong>
+                        </Alert>
+                    )}
+                    
+                    <Collapse in={otaExpanded}>
+                        <Divider sx={{ my: 2 }} />
+                        <Stack spacing={2}>
+                            <Typography variant="body2" color="text.secondary">
+                                Wybierz wersję firmware do wgrania na urządzenie poprzez MQTT.
+                                Urządzenie pobierze firmware z serwera i automatycznie się zrestartuje.
+                            </Typography>
+                            
+                            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+                                <FormControl size="small" sx={{ minWidth: 200 }}>
+                                    <InputLabel>Wersja firmware</InputLabel>
+                                    <Select
+                                        value={selectedFirmware}
+                                        label="Wersja firmware"
+                                        onChange={(e) => setSelectedFirmware(e.target.value)}
+                                        disabled={otaLoading || firmwareList.length === 0}
+                                    >
+                                        {firmwareList.map((fw) => (
+                                            <MenuItem key={fw.version} value={fw.version}>
+                                                {fw.version} ({(fw.size / 1024).toFixed(0)} KB)
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<CloudUploadIcon />}
+                                    onClick={handleDeployFirmware}
+                                    disabled={otaLoading || !selectedFirmware}
+                                >
+                                    {otaLoading ? <CircularProgress size={24} /> : 'Rozpocznij aktualizację'}
+                                </Button>
+                                
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<RefreshIcon />}
+                                    onClick={() => { fetchFirmwareList(); checkForUpdates(); }}
+                                    disabled={otaLoading}
+                                >
+                                    Odśwież listę
+                                </Button>
+                            </Stack>
+                            
+                            {firmwareList.length === 0 && (
+                                <Typography variant="body2" color="text.secondary">
+                                    Brak dostępnych wersji firmware. Prześlij firmware w panelu administracyjnym.
+                                </Typography>
+                            )}
+                        </Stack>
                     </Collapse>
                 </CardContent>
             </Card>

@@ -7,6 +7,7 @@ import DeviceManagementInfo from "./DeviceManagementInfo";
 import DeviceManagementWifi from "./DeviceManagementWifi";
 import DeviceManagementSensors from "./DeviceManagementSensors";
 import DeviceManagementLed from "./DeviceManagementLed";
+import DeviceManagementConfig from "./DeviceManagementConfig";
 
 function CustomTabPanel(props: {
   children?: React.ReactNode;
@@ -42,6 +43,7 @@ export default function DeviceManagement({ server, setServer }: {
           <Tab label="WiFi Configuration" />
           <Tab label="Sensors" />
           <Tab label="LED" />
+          <Tab label="Device Config" />
         </Tabs>
       </Box>
       <CustomTabPanel value={tab} index={0}>
@@ -55,6 +57,9 @@ export default function DeviceManagement({ server, setServer }: {
       </CustomTabPanel>
       <CustomTabPanel value={tab} index={3}>
         <DeviceManagementLed server={server} />
+      </CustomTabPanel>
+      <CustomTabPanel value={tab} index={4}>
+        <DeviceManagementConfig server={server} />
       </CustomTabPanel>
     </>
   );

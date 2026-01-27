@@ -109,4 +109,56 @@ export const devicesApi = {
         }>(`/devices/${deviceId}/sensors/latest`);
         return response.data;
     },
+
+    /**
+     * Get all owned devices with their latest sensor data (including GPS)
+     * Used for map display
+     */
+    getDevicesWithLocations: async () => {
+        const response = await axios.get<LimitedResponse<DeviceModel>>('/devices/owned');
+        const devices = response.data.content || [];
+        
+        // Fetch latest sensors for each device in parallel
+        const devicesWithLocations = await Promise.all(
+            devices.map(async (device) => {
+                try {
+                    const sensors = await axios.get<{
+                        timestamp: string | null;
+                        temperature: number | null;
+                        humidity: number | null;
+                        pressure: number | null;
+                        pm2_5: number | null;
+                        pm10_0: number | null;
+                        latitude: number | null;
+                        longitude: number | null;
+                    }>(`/devices/${device.id}/sensors/latest`);
+                    return {
+                        ...device,
+                        latitude: sensors.data.latitude,
+                        longitude: sensors.data.longitude,
+                        temperature: sensors.data.temperature,
+                        humidity: sensors.data.humidity,
+                        pressure: sensors.data.pressure,
+                        pm2_5: sensors.data.pm2_5,
+                        pm10_0: sensors.data.pm10_0,
+                        last_reading: sensors.data.timestamp,
+                    };
+                } catch {
+                    return {
+                        ...device,
+                        latitude: null,
+                        longitude: null,
+                        temperature: null,
+                        humidity: null,
+                        pressure: null,
+                        pm2_5: null,
+                        pm10_0: null,
+                        last_reading: null,
+                    };
+                }
+            })
+        );
+        
+        return devicesWithLocations;
+    },
 };
