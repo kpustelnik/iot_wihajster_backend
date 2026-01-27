@@ -345,6 +345,9 @@ async def confirm_device_connection(
     result = await db.execute(select(Device).where(Device.id == device_id))
     device = result.scalar_one_or_none()
     
+    # Import ownership repo for creating ownership
+    from frontend_api.repos.ownership_repo import create_ownership
+    
     if binding_status == 1 or owner_user_id == current_user.id:
         if device is not None:
             # Device exists - update ownership
@@ -373,6 +376,14 @@ async def confirm_device_connection(
             await db.execute(text("SELECT setval('devices_id_seq', GREATEST((SELECT MAX(id) FROM devices), :id))"), {'id': device_id})
             await db.commit()
             print(f"Device {device_id} created and bound to user {current_user.id} in database (new)")
+        
+        # Create ownership record for the device (required for measurements to be saved)
+        try:
+            await create_ownership(db, current_user, device_id)
+            print(f"Ownership created for device {device_id} and user {current_user.id}")
+        except ValueError as e:
+            # Ownership might already exist (e.g., device reconnection)
+            print(f"Ownership already exists or error: {e}")
     
     return {
         'pin': pin,

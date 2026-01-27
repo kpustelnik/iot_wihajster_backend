@@ -1,19 +1,25 @@
 "use client";
 
+import { useState } from 'react';
 import {
     Box,
     Paper,
     Typography,
     IconButton,
     Fade,
+    useMediaQuery,
+    useTheme,
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CloseIcon from '@mui/icons-material/Close';
 import DevicesIcon from '@mui/icons-material/Devices';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import BluetoothIcon from '@mui/icons-material/Bluetooth';
+import SettingsBluetoothIcon from '@mui/icons-material/SettingsBluetooth';
 import DeviceDetails from './DeviceDetails';
 import DeviceConnector from './DeviceConnector';
+import DeviceManagement from './DeviceManagement';
 import type { MenuOption } from './LeftSidebar';
 import type { DeviceModel } from '@/lib/api/schemas';
 
@@ -33,9 +39,34 @@ const SIDEBAR_WIDTH = 520;
 const LEFT_SIDEBAR_WIDTH = 56;
 
 export default function Sidebar({ isVisible, content, selectedDevice, onToggle, isLeftSidebarVisible, onDeviceConnected, onDeviceReleased, bleServer, setBleServer }: SidebarProps) {
+    const [bleSettingsOpen, setBleSettingsOpen] = useState(false);
+    const muiTheme = useTheme();
+    const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+    
+    const sidebarWidth = isMobile ? '100vw' : SIDEBAR_WIDTH;
+
     const renderContent = () => {
         switch (content) {
             case 'bluetooth':
+                // If BLE server connected and settings open, show DeviceManagement
+                if (bleServer && bleServer.connected && bleSettingsOpen) {
+                    return (
+                        <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                <SettingsBluetoothIcon color="primary" />
+                                <Typography variant="h5">Zarządzanie urządzeniem</Typography>
+                            </Box>
+                            <DeviceManagement 
+                                server={bleServer} 
+                                setServer={(server) => {
+                                    if (setBleServer) setBleServer(server);
+                                    if (!server) setBleSettingsOpen(false);
+                                }} 
+                            />
+                        </Box>
+                    );
+                }
+                
                 return (
                     <Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -48,6 +79,7 @@ export default function Sidebar({ isVisible, content, selectedDevice, onToggle, 
                         <DeviceConnector 
                             server={bleServer}
                             setServer={setBleServer}
+                            setSettingsOpen={setBleSettingsOpen}
                             onDeviceConnected={onDeviceConnected} 
                         />
                     </Box>
@@ -101,7 +133,7 @@ export default function Sidebar({ isVisible, content, selectedDevice, onToggle, 
         return null;
     }
 
-    const leftOffset = isLeftSidebarVisible ? LEFT_SIDEBAR_WIDTH : 0;
+    const leftOffset = isLeftSidebarVisible && !isMobile ? LEFT_SIDEBAR_WIDTH : 0;
 
     return (
         <>
@@ -110,9 +142,9 @@ export default function Sidebar({ isVisible, content, selectedDevice, onToggle, 
                     elevation={4}
                     sx={{
                         position: 'fixed',
-                        left: leftOffset,
+                        left: isMobile ? 0 : leftOffset,
                         top: 0,
-                        width: SIDEBAR_WIDTH,
+                        width: sidebarWidth,
                         height: '100vh',
                         overflowY: 'auto',
                         zIndex: 1100,
@@ -120,30 +152,47 @@ export default function Sidebar({ isVisible, content, selectedDevice, onToggle, 
                         display: isVisible ? 'block' : 'none',
                     }}
                 >
-                    <Box sx={{ p: 2 }}>
+                    {/* Mobile close button */}
+                    {isMobile && (
+                        <IconButton
+                            onClick={onToggle}
+                            sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                zIndex: 1,
+                            }}
+                        >
+                            <CloseIcon />
+                        </IconButton>
+                    )}
+                    <Box sx={{ p: 2, pt: isMobile ? 6 : 2 }}>
                         {renderContent()}
                     </Box>
                 </Paper>
             </Fade>
 
-            <IconButton
-                onClick={onToggle}
-                aria-label={isVisible ? 'Ukryj panel' : 'Pokaż panel'}
-                sx={{
-                    position: 'fixed',
-                    left: isVisible ? leftOffset + SIDEBAR_WIDTH : leftOffset,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 1150,
-                    bgcolor: 'background.paper',
-                    boxShadow: 2,
-                    '&:hover': {
-                        bgcolor: 'action.hover',
-                    },
-                }}
-            >
-                {isVisible ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-            </IconButton>
+            {/* Toggle button - hide on mobile when sidebar is open */}
+            {!(isMobile && isVisible) && (
+                <IconButton
+                    onClick={onToggle}
+                    aria-label={isVisible ? 'Ukryj panel' : 'Pokaż panel'}
+                    sx={{
+                        position: 'fixed',
+                        left: isVisible ? (isMobile ? 0 : leftOffset + SIDEBAR_WIDTH) : leftOffset,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        zIndex: 1150,
+                        bgcolor: 'background.paper',
+                        boxShadow: 2,
+                        '&:hover': {
+                            bgcolor: 'action.hover',
+                        },
+                    }}
+                >
+                    {isVisible ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+                </IconButton>
+            )}
         </>
     );
 }

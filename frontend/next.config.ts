@@ -8,10 +8,15 @@ const withSerwist = withSerwistInit({
   swDest: "public/sw.js",
 });
 
+const basePath = process.env.PAGES_BASE_PATH ?? '';
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['wihajster-front.ivk.pl'],
   output: 'export',
-  basePath: process.env.PAGES_BASE_PATH ?? ''
+  basePath: basePath,
+  env: {
+    NEXT_PUBLIC_BASE_PATH: basePath,
+  },
 };
 
 export default withSerwist(nextConfig);

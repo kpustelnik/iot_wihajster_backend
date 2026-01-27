@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { navigateTo } from '@/lib/navigation';
 import {
     Box,
     Card,
@@ -273,7 +274,7 @@ export default function Dashboard({ deviceId }: DashboardProps) {
         try {
             await devicesApi.release(deviceId);
             showMessage('success', 'Urządzenie zwolnione');
-            window.location.href = '/';
+            navigateTo('/');
         } catch {
             showMessage('error', 'Nie udało się zwolnić urządzenia');
         }
