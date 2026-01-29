@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -224,7 +224,26 @@ async def discord_callback(
 
     # Build response
     if redirect_after:
-        response = RedirectResponse(url=redirect_after)
+        # Return HTML page that redirects via JavaScript
+        # This avoids Service Worker issues with cross-origin redirects
+        # Parse the redirect URL to add token params
+        separator = '&' if '?' in redirect_after else '?'
+        final_url = f"{redirect_after}{separator}discord_token={token}&discord_user_id={user.id}"
+        
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Logowanie...</title>
+</head>
+<body>
+    <p>Przekierowanie...</p>
+    <script>
+        window.location.replace("{final_url}");
+    </script>
+</body>
+</html>"""
+        response = HTMLResponse(content=html_content)
     else:
         response = JSONResponse({
             "token": token,

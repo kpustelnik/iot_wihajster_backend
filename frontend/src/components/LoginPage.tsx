@@ -12,9 +12,10 @@ import {
     Paper,
     CircularProgress,
 } from "@mui/material";
-import { usersApi } from "@/lib/api";
+import { usersApi, API_ENDPOINTS } from "@/lib/api";
 import { authUtils } from "@/lib/auth";
 import type { LoginModel } from "@/lib/api";
+import client from "@/lib/AxiosClient";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -181,6 +182,37 @@ export default function LoginPage() {
                     endIcon={isRecovering ? <CircularProgress size={20} /> : null}
                 >
                     {isRecovering ? "Recovering..." : "Recover Password"}
+                </Button>
+
+                <Box sx={{ my: 3, display: 'flex', alignItems: 'center' }}>
+                    <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
+                    <Typography variant="body2" color="text.secondary" sx={{ px: 2 }}>
+                        lub
+                    </Typography>
+                    <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
+                </Box>
+
+                <Button
+                    fullWidth
+                    variant="outlined"
+                    size="large"
+                    onClick={() => {
+                        const baseUrl = client.defaults.baseURL;
+                        const redirectUrl = encodeURIComponent(window.location.origin + '/map');
+                        window.location.href = `${baseUrl}${API_ENDPOINTS.auth.discordLogin}?redirect_after=${redirectUrl}`;
+                    }}
+                    sx={{ 
+                        mb: 2, 
+                        py: 1.5,
+                        borderColor: '#5865F2',
+                        color: '#5865F2',
+                        '&:hover': {
+                            borderColor: '#4752C4',
+                            bgcolor: 'rgba(88, 101, 242, 0.04)'
+                        }
+                    }}
+                >
+                    🎮 Zaloguj przez Discord
                 </Button>
 
                 <Box sx={{ textAlign: "center", mt: 2 }}>

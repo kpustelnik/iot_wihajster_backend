@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import LeftSidebar, { MenuOption } from '@/components/LeftSidebar';
@@ -30,8 +30,9 @@ const Map = dynamic(() => import('@/components/Map'), {
     ),
 });
 
-export default function MapPage() {
+function MapPageContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const [selectedOption, setSelectedOption] = useState<MenuOption | null>('devices');
     const [selectedDevice, setSelectedDevice] = useState<DeviceModel | null>(null);
@@ -40,6 +41,19 @@ export default function MapPage() {
     const [bleServer, setBleServer] = useState<BluetoothRemoteGATTServer | null>(null);
 
     useEffect(() => {
+        // Check for Discord OAuth token in URL params
+        const discordToken = searchParams.get('discord_token');
+        const discordUserId = searchParams.get('discord_user_id');
+        
+        if (discordToken && discordUserId) {
+            // Save auth data from Discord OAuth
+            authUtils.saveAuth(discordToken, parseInt(discordUserId, 10));
+            // Clean URL by removing query params
+            window.history.replaceState({}, '', '/map');
+            setIsAuthenticated(true);
+            return;
+        }
+
         // Check authentication status
         const checkAuth = () => {
             if (!authUtils.isAuthenticated()) {
@@ -51,7 +65,7 @@ export default function MapPage() {
         };
 
         checkAuth();
-    }, [router]);
+    }, [router, searchParams]);
 
     const handleSelectOption = (option: MenuOption) => {
         setSelectedOption(option);
@@ -138,5 +152,27 @@ export default function MapPage() {
                 <ThemeToggle />
             </Box>
         </Box>
+    );
+}
+
+export default function MapPageWrapper() {
+    return (
+        <Suspense fallback={
+            <Box 
+                sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    height: '100vh',
+                    gap: 2
+                }}
+            >
+                <CircularProgress size={48} />
+                <Typography color="text.secondary">Ładowanie...</Typography>
+            </Box>
+        }>
+            <MapPageContent />
+        </Suspense>
     );
 }

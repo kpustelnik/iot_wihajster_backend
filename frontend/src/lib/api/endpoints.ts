@@ -21,6 +21,9 @@ export const API_ENDPOINTS = {
         search: '/users/search',
         byId: (userId: number) => `/users/${userId}`,
     },
+    auth: {
+        discordLogin: '/auth/discord/login',
+    },
     families: {
         list: '/families',
         byId: (familyId: number) => `/families/${familyId}`,
