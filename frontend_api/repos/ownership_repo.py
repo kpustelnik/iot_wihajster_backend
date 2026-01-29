@@ -60,6 +60,21 @@ async def get_user_ownerships(
     )
 
 
+async def get_existing_ownership_for_user_and_device(
+        db: AsyncSession,
+        user_id: int,
+        device_id: int
+) -> Optional[Ownership]:
+    """Pobiera istniejący ownership (aktywny lub nieaktywny) dla danego użytkownika i urządzenia"""
+    query = select(Ownership).where(
+        and_(
+            Ownership.user_id == user_id,
+            Ownership.device_id == device_id
+        )
+    )
+    return await db.scalar(query)
+
+
 async def create_ownership(
         db: AsyncSession,
         user: User,
@@ -67,14 +82,32 @@ async def create_ownership(
 ) -> Ownership:
     """
     Tworzy nowy ownership dla użytkownika i urządzenia.
-    Dezaktywuje poprzedni ownership jeśli istnieje.
+    Jeśli użytkownik już miał ownership do tego urządzenia (nieaktywny) - reaktywuje go.
+    Dezaktywuje poprzedni aktywny ownership jeśli istnieje.
     """
-    # Najpierw dezaktywuj poprzedni ownership
+    # Zapisz user_id na początku - po operacjach DB obiekt user może być expired
+    user_id = user.id
+    
+    # Sprawdź czy użytkownik już miał ownership do tego urządzenia
+    existing_ownership = await get_existing_ownership_for_user_and_device(db, user_id, device_id)
+    
+    if existing_ownership is not None:
+        # Reaktywuj istniejący ownership (dzięki temu użytkownik zobaczy swoje stare pomiary)
+        # Najpierw dezaktywuj inny aktywny ownership jeśli istnieje
+        await deactivate_device_ownership(db, device_id)
+        
+        existing_ownership.is_active = True
+        existing_ownership.deactivated_at = None
+        await db.commit()
+        await db.refresh(existing_ownership)
+        return existing_ownership
+    
+    # Nie ma istniejącego ownership - dezaktywuj poprzedni i utwórz nowy
     await deactivate_device_ownership(db, device_id)
     
     # Utwórz nowy ownership
     ownership = Ownership(
-        user_id=user.id,
+        user_id=user_id,
         device_id=device_id,
         is_active=True,
         created_at=datetime.utcnow()

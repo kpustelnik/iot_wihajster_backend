@@ -42,12 +42,12 @@ async def get_measurements(
     # lub publiczne/protected przez family
     query = (
         select(Measurement)
-        .join(Ownership, Measurement.ownership_id == Ownership.id)
+        .join(Ownership, and_(Measurement.ownership_id == Ownership.id, Ownership.is_active == True))
         .join(Device, Ownership.device_id == Device.id)
         .outerjoin(FamilyDevice, FamilyDevice.device_id == Device.id)
         .where(or_(
-            # Własne pomiary (użytkownik jest właścicielem ownership)
-            Ownership.user_id == user.id,
+            # Własne pomiary (użytkownik jest właścicielem AKTYWNEGO ownership)
+            and_(Ownership.user_id == user.id, Ownership.is_active == True),
             # Publiczne urządzenia
             Device.privacy == PrivacyLevel.PUBLIC,
             # Protected urządzenia z family użytkownika
@@ -91,11 +91,11 @@ async def get_measurements(
     count_query = (
         select(func.count())
         .select_from(Measurement)
-        .join(Ownership, Measurement.ownership_id == Ownership.id)
+        .join(Ownership, and_(Measurement.ownership_id == Ownership.id, Ownership.is_active == True))
         .join(Device, Ownership.device_id == Device.id)
         .outerjoin(FamilyDevice, FamilyDevice.device_id == Device.id)
         .where(or_(
-            Ownership.user_id == user.id,
+            and_(Ownership.user_id == user.id, Ownership.is_active == True),
             Device.privacy == PrivacyLevel.PUBLIC,
             and_(
                 FamilyDevice.family_id.in_(family_ids_subq),
@@ -174,7 +174,7 @@ async def get_measurements(
                 func.avg(Measurement.latitude).label("latitude"),
             )
             .select_from(Measurement)
-            .join(Ownership, Measurement.ownership_id == Ownership.id)
+            .join(Ownership, and_(Measurement.ownership_id == Ownership.id, Ownership.is_active == True))
             .where(query.whereclause)
             .group_by(bucket_time, Measurement.ownership_id, Ownership.device_id)
             .order_by(bucket_time.desc())

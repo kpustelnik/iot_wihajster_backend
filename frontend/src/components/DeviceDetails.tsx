@@ -149,11 +149,18 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
 
     const fetchMeasurements = async () => {
         setLoading(true);
+        console.log('[DeviceDetails] fetchMeasurements starting for device:', device.id, 'timescale:', timescale);
         try {
             const data = await measurementsApi.getMeasurements({
                 device_id: device.id,
                 limit: 500,
                 timescale: timescale
+            });
+            console.log('[DeviceDetails] fetchMeasurements result:', {
+                total: data.total,
+                contentLength: data.content?.length,
+                firstItem: data.content?.[0],
+                lastItem: data.content?.[data.content?.length - 1]
             });
             setMeasurements(data.content || []);
         } catch (error) {

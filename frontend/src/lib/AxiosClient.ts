@@ -23,7 +23,9 @@ client.interceptors.request.use(
 
 // Response interceptor to handle 401 errors (unauthorized)
 client.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        return response;
+    },
     (error) => {
         if (error.response?.status === 401) {
             // Token is invalid or expired, clear auth and redirect to login
