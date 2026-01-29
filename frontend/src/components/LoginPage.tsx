@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
     Box,
     Button,
@@ -181,6 +182,15 @@ export default function LoginPage() {
                 >
                     {isRecovering ? "Recovering..." : "Recover Password"}
                 </Button>
+
+                <Box sx={{ textAlign: "center", mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                        Nie masz konta?{" "}
+                        <Link href="/register" style={{ color: "#1976d2", textDecoration: "none" }}>
+                            Zarejestruj się
+                        </Link>
+                    </Typography>
+                </Box>
             </Paper>
         </Box>
     );

@@ -21,6 +21,7 @@ import AirIcon from '@mui/icons-material/Air';
 import ThermostatIcon from '@mui/icons-material/Thermostat';
 import CloudIcon from '@mui/icons-material/Cloud';
 import LoginIcon from '@mui/icons-material/Login';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { authUtils } from '@/lib/auth';
 import ThemeToggle from '@/components/ThemeToggle';
 
@@ -82,6 +83,22 @@ export default function Home() {
                     </Typography>
                     <Stack direction="row" spacing={2} alignItems="center">
                         <ThemeToggle />
+                        <Link href="/register" passHref>
+                            <Button 
+                                variant="outlined" 
+                                startIcon={<PersonAddIcon />}
+                                sx={{ 
+                                    borderColor: 'white',
+                                    color: 'white',
+                                    '&:hover': { 
+                                        borderColor: 'grey.100',
+                                        bgcolor: 'rgba(255,255,255,0.1)'
+                                    }
+                                }}
+                            >
+                                Zarejestruj się
+                            </Button>
+                        </Link>
                         <Link href="/login" passHref>
                             <Button 
                                 variant="contained" 
