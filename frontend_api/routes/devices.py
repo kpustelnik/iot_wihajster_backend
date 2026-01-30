@@ -17,6 +17,8 @@ from frontend_api.repos import device_repo
 from app_common.schemas.device import DeviceConnectInit, DeviceConnectConfirm, DeviceProvision, DeviceCreate, \
     DeviceModel
 
+from frontend_api.repos.ownership_repo import create_ownership
+
 from app_common.utils.certs.ca import CertificateAuthority
 
 from cryptography import x509
@@ -56,9 +58,15 @@ router = APIRouter(
 )
 async def provision_device(
     req: DeviceProvision,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN]))
 ):
     device = await device_repo.create_device(db, device=DeviceCreate())
+    device_id = device.id
+
+    # Utwórz ownership (reaktywuje istniejący jeśli użytkownik już miał to urządzenie)
+    ownership = await create_ownership(db, current_user, device_id)
+    ownership_id = ownership.id
 
     ca = CertificateAuthority()
     device_cert = ca.issue_device_certificate(serial_number=str(device.id))
@@ -67,7 +75,6 @@ async def provision_device(
         'device_cert': device_cert.cert_chain_pems[0].bytes().decode("utf-8"),
         'device_key': device_cert.private_key_pem.bytes().decode("utf-8")
     }
-
 
 
 
