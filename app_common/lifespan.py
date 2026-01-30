@@ -23,7 +23,8 @@ async def fix_postgres_sequences(session):
     tables_with_sequences = [
         ('users', 'users_id_seq', 'id'),
         ('devices', 'devices_id_seq', 'id'),
-        ('families', 'families_id_seq', 'id')
+        ('families', 'families_id_seq', 'id'),
+        ('ownerships', 'ownerships_id_seq', 'id'),
     ]
     
     for table_name, seq_name, id_field in tables_with_sequences:
