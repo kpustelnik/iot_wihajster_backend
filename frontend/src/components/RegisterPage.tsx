@@ -201,7 +201,8 @@ export default function RegisterPage() {
                     size="large"
                     onClick={() => {
                         const baseUrl = client.defaults.baseURL;
-                        const redirectUrl = encodeURIComponent(window.location.origin + '/map');
+                        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+                        const redirectUrl = encodeURIComponent(window.location.origin + basePath + '/map');
                         window.location.href = `${baseUrl}${API_ENDPOINTS.auth.discordLogin}?redirect_after=${redirectUrl}`;
                     }}
                     sx={{ 
