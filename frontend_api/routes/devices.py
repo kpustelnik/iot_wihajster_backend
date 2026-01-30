@@ -69,7 +69,7 @@ async def provision_device(
     ownership_id = ownership.id
 
     ca = CertificateAuthority()
-    device_cert = ca.issue_device_certificate(serial_number=str(device.id))
+    device_cert = ca.issue_device_certificate(serial_number=str(device_id))
     return {
         'ca_cert': ca.get_ca_pem().decode("utf-8"),
         'device_cert': device_cert.cert_chain_pems[0].bytes().decode("utf-8"),
