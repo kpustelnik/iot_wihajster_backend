@@ -5,12 +5,14 @@ import client from '../AxiosClient';
 
 export interface FirmwareInfo {
     version: string;
+    version_code?: number;
     filename: string;
     size: number;
     sha256: string;
     upload_date: string;
     chip_type: string;
-    url?: string;
+    download_url?: string;
+    release_notes?: string;
 }
 
 export interface FirmwareListResponse {
@@ -21,8 +23,33 @@ export interface FirmwareListResponse {
 export interface UpdateCheckResponse {
     update_available: boolean;
     current_version: string;
+    current_version_code?: number;
     latest_version?: string;
+    latest_version_code?: number;
     latest_info?: FirmwareInfo;
+    message?: string;
+}
+
+export interface DeployFirmwareResponse {
+    success: boolean;
+    message: string;
+    device_id: number;
+    version: string;
+    version_code?: number;
+    current_version?: string;
+    current_version_code?: number;
+    download_url?: string;
+    sha256?: string;
+}
+
+export interface AvailableUpdatesResponse {
+    device_id: number;
+    chip_type: string;
+    current_version?: string;
+    current_version_code?: number;
+    available_updates: FirmwareInfo[];
+    count: number;
+    message?: string;
 }
 
 // List all firmware versions
@@ -50,13 +77,14 @@ export async function checkForUpdates(
 }
 
 // Deploy firmware to device
-export async function deployFirmware(device_id: number, version: string): Promise<{
-    success: boolean;
-    message: string;
-    device_id: number;
-    version: string;
-}> {
+export async function deployFirmware(device_id: number, version: string): Promise<DeployFirmwareResponse> {
     const response = await client.post('/firmware/deploy', { device_id, version });
+    return response.data;
+}
+
+// Get available updates for device (only versions higher than current)
+export async function getAvailableUpdates(device_id: number): Promise<AvailableUpdatesResponse> {
+    const response = await client.get(`/firmware/available/${device_id}`);
     return response.data;
 }
 

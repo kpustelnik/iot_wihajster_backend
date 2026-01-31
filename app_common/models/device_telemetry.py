@@ -37,6 +37,7 @@ class DeviceTelemetry(Base):
     min_heap: Mapped[int] = mapped_column(Integer, default=0)
     total_heap: Mapped[int] = mapped_column(Integer, default=0)
     firmware_version: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    firmware_version_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     idf_version: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     chip_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     chip_revision: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -143,6 +144,7 @@ class DeviceTelemetry(Base):
             min_heap=system.get("min_heap", 0),
             total_heap=system.get("total_heap", 0),
             firmware_version=str(system.get("firmware")) if system.get("firmware") else None,
+            firmware_version_code=int(system.get("firmware")) if system.get("firmware") and str(system.get("firmware")).isdigit() else None,
             idf_version=system.get("idf"),
             chip_type=system.get("chip"),
             chip_revision=system.get("chip_rev"),

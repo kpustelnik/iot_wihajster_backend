@@ -20,6 +20,7 @@ from starlette import status
 
 from app_common.database import get_db
 from app_common.models.device import Device
+from app_common.models.device_telemetry import DeviceTelemetry
 from app_common.models.firmware import Firmware
 from app_common.models.user import UserType, User
 from app_common.schemas.firmware import (
@@ -30,6 +31,7 @@ from app_common.schemas.firmware import (
     FirmwareUpdateCheck,
     OtaDeployRequest,
     OtaDeployResponse,
+    AvailableUpdatesResponse,
 )
 from app_common.utils.r2_client import r2_client, compute_sha256, generate_firmware_key
 from frontend_api.docs import Tags
@@ -535,6 +537,15 @@ async def deploy_firmware(
             detail="You don't have permission to update this device"
         )
 
+    # Pobierz najnowszą telemetrię urządzenia, aby sprawdzić aktualną wersję firmware
+    telemetry_result = await db.execute(
+        select(DeviceTelemetry)
+        .where(DeviceTelemetry.device_id == req.device_id)
+        .order_by(desc(DeviceTelemetry.received_at))
+        .limit(1)
+    )
+    current_telemetry = telemetry_result.scalar_one_or_none()
+
     # Znajdź firmware dla typu chipa urządzenia
     firmware_result = await db.execute(
         select(Firmware).where(
@@ -550,6 +561,24 @@ async def deploy_firmware(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Firmware version {req.version} for chip type {device.chip_type} not found"
         )
+
+    # Sprawdź czy użytkownik nie próbuje zainstalować starszej wersji (downgrade)
+    if current_telemetry and current_telemetry.firmware_version_code is not None:
+        current_version_code = current_telemetry.firmware_version_code
+        if firmware.version_code < current_version_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Nie można zainstalować starszej wersji firmware. "
+                       f"Aktualna wersja urządzenia: {current_telemetry.firmware_version} (code: {current_version_code}), "
+                       f"żądana wersja: {req.version} (code: {firmware.version_code}). "
+                       f"Downgrade nie jest dozwolony."
+            )
+        if firmware.version_code == current_version_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Urządzenie ma już zainstalowaną wersję {req.version} (code: {current_version_code}). "
+                       f"Aktualizacja do tej samej wersji nie jest wymagana."
+            )
 
     # Wygeneruj presigned URL ważny 24h
     try:
@@ -579,6 +608,8 @@ async def deploy_firmware(
         device_id=req.device_id,
         version=req.version,
         version_code=firmware.version_code if success else None,
+        current_version=current_telemetry.firmware_version if current_telemetry else None,
+        current_version_code=current_telemetry.firmware_version_code if current_telemetry else None,
         download_url=ota_url if success else None,
         sha256=firmware.sha256 if success else None
     )
@@ -650,6 +681,89 @@ async def check_for_updates(
         latest_version_code=latest.version_code,
         latest_info=latest_info,
         message="Update available" if update_available else "You have the latest version"
+    )
+
+
+@router.get(
+    "/available/{device_id}",
+    response_model=AvailableUpdatesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get available firmware updates for device",
+)
+async def get_available_updates(
+    device_id: int,
+    current_user: User = Depends(RequireUser([UserType.CLIENT, UserType.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Pobierz listę dostępnych wersji firmware, do których można zaktualizować urządzenie.
+    
+    Zwraca tylko wersje wyższe niż aktualnie zainstalowana na urządzeniu.
+    Wersje są posortowane od najnowszej do najstarszej.
+    """
+    # Sprawdź czy urządzenie istnieje i użytkownik ma dostęp
+    device_result = await db.execute(select(Device).where(Device.id == device_id))
+    device = device_result.scalar_one_or_none()
+
+    if device is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found"
+        )
+
+    if device.user_id != current_user.id and current_user.type != UserType.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this device"
+        )
+
+    # Pobierz najnowszą telemetrię urządzenia
+    telemetry_result = await db.execute(
+        select(DeviceTelemetry)
+        .where(DeviceTelemetry.device_id == device_id)
+        .order_by(desc(DeviceTelemetry.received_at))
+        .limit(1)
+    )
+    current_telemetry = telemetry_result.scalar_one_or_none()
+    
+    current_version = current_telemetry.firmware_version if current_telemetry else None
+    current_version_code = current_telemetry.firmware_version_code if current_telemetry else None
+
+    # Znajdź dostępne firmware dla typu chipa urządzenia
+    query = select(Firmware).where(
+        Firmware.is_active == True,
+        Firmware.chip_type == device.chip_type
+    )
+    
+    # Jeśli znamy aktualną wersję, filtruj tylko nowsze wersje
+    if current_version_code is not None:
+        query = query.where(Firmware.version_code > current_version_code)
+    
+    query = query.order_by(desc(Firmware.version_code))
+    
+    result = await db.execute(query)
+    firmwares = result.scalars().all()
+
+    available_updates = []
+    for fw in firmwares:
+        info = await firmware_to_info(fw, include_url=False)
+        available_updates.append(info)
+
+    message = None
+    if not available_updates:
+        if current_version_code is not None:
+            message = "Urządzenie ma najnowszą wersję firmware"
+        else:
+            message = f"Brak dostępnych wersji firmware dla typu chipa: {device.chip_type}"
+
+    return AvailableUpdatesResponse(
+        device_id=device_id,
+        chip_type=device.chip_type,
+        current_version=current_version,
+        current_version_code=current_version_code,
+        available_updates=available_updates,
+        count=len(available_updates),
+        message=message
     )
 
 

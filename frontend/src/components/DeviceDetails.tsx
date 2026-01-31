@@ -95,16 +95,39 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
     const [selectedFirmware, setSelectedFirmware] = useState<string>('');
     const [otaLoading, setOtaLoading] = useState(false);
     const [updateAvailable, setUpdateAvailable] = useState<firmwareApi.UpdateCheckResponse | null>(null);
+    const [currentFirmwareVersion, setCurrentFirmwareVersion] = useState<string | null>(null);
+    const [currentFirmwareVersionCode, setCurrentFirmwareVersionCode] = useState<number | null>(null);
 
     const fetchFirmwareList = async () => {
         try {
-            const response = await firmwareApi.listFirmware();
-            setFirmwareList(response.firmwares || []);
-            if (response.firmwares?.length > 0) {
-                setSelectedFirmware(response.firmwares[0].version);
+            // Pobierz aktualną wersję urządzenia z getAvailableUpdates
+            const availableResponse = await firmwareApi.getAvailableUpdates(device.id);
+            setCurrentFirmwareVersion(availableResponse.current_version || null);
+            setCurrentFirmwareVersionCode(availableResponse.current_version_code || null);
+            
+            // Pobierz wszystkie wersje firmware (włącznie ze starszymi)
+            const allFirmwareResponse = await firmwareApi.listFirmware();
+            setFirmwareList(allFirmwareResponse.firmwares || []);
+            
+            // Domyślnie wybierz najnowszą wersję dostępną do aktualizacji
+            if (availableResponse.available_updates?.length > 0) {
+                setSelectedFirmware(availableResponse.available_updates[0].version);
+            } else if (allFirmwareResponse.firmwares?.length > 0) {
+                // Jeśli brak nowszych wersji, nie wybieraj nic
+                setSelectedFirmware('');
             }
         } catch (error) {
             console.error('Failed to fetch firmware list:', error);
+            // Fallback - pobierz tylko listę wszystkich wersji
+            try {
+                const response = await firmwareApi.listFirmware();
+                setFirmwareList(response.firmwares || []);
+                if (response.firmwares?.length > 0) {
+                    setSelectedFirmware(response.firmwares[0].version);
+                }
+            } catch (fallbackError) {
+                console.error('Failed to fetch firmware list (fallback):', fallbackError);
+            }
         }
     };
 
@@ -115,7 +138,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
             if (latest) {
                 setUpdateAvailable({
                     update_available: true,
-                    current_version: 'unknown',
+                    current_version: currentFirmwareVersion || 'unknown',
                     latest_version: latest.version,
                     latest_info: latest
                 });
@@ -130,9 +153,27 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
         setOtaLoading(true);
         try {
             const result = await firmwareApi.deployFirmware(device.id, selectedFirmware);
-            showCommandResult(result.success, `Aktualizacja OTA rozpoczęta: ${selectedFirmware}`);
-        } catch {
-            showCommandResult(false, 'Błąd rozpoczynania aktualizacji OTA');
+            if (result.success) {
+                showCommandResult(true, `Aktualizacja OTA rozpoczęta: ${selectedFirmware}`);
+            } else {
+                showCommandResult(false, result.message || 'Nie udało się rozpocząć aktualizacji');
+            }
+        } catch (error: unknown) {
+            // Obsłuż błędy z API (np. próba downgrade'u)
+            interface AxiosErrorResponse {
+                response?: {
+                    data?: {
+                        detail?: string;
+                    };
+                    status?: number;
+                };
+                message?: string;
+            }
+            const axiosError = error as AxiosErrorResponse;
+            const errorMessage = axiosError?.response?.data?.detail 
+                || axiosError?.message 
+                || 'Błąd rozpoczynania aktualizacji OTA';
+            showCommandResult(false, errorMessage);
         } finally {
             setOtaLoading(false);
         }
@@ -959,13 +1000,22 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                     <Collapse in={otaExpanded}>
                         <Divider sx={{ my: 2 }} />
                         <Stack spacing={2}>
+                            {currentFirmwareVersion && (
+                                <Typography variant="body2">
+                                    Aktualna wersja firmware: <strong>{currentFirmwareVersion}</strong>
+                                    {currentFirmwareVersionCode && ` (code: ${currentFirmwareVersionCode})`}
+                                </Typography>
+                            )}
+                            
                             <Typography variant="body2" color="text.secondary">
                                 Wybierz wersję firmware do wgrania na urządzenie poprzez MQTT.
                                 Urządzenie pobierze firmware z serwera i automatycznie się zrestartuje.
+                                <br />
+                                <em>Uwaga: Można aktualizować tylko do nowszych wersji.</em>
                             </Typography>
                             
                             <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-                                <FormControl size="small" sx={{ minWidth: 200 }}>
+                                <FormControl size="small" sx={{ minWidth: 280 }}>
                                     <InputLabel>Wersja firmware</InputLabel>
                                     <Select
                                         value={selectedFirmware}
@@ -973,11 +1023,26 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                         onChange={(e) => setSelectedFirmware(e.target.value)}
                                         disabled={otaLoading || firmwareList.length === 0}
                                     >
-                                        {firmwareList.map((fw) => (
-                                            <MenuItem key={fw.version} value={fw.version}>
-                                                {fw.version} ({(fw.size / 1024).toFixed(0)} KB)
-                                            </MenuItem>
-                                        ))}
+                                        {firmwareList.map((fw) => {
+                                            const isOlderOrEqual = currentFirmwareVersionCode !== null && 
+                                                fw.version_code !== undefined && 
+                                                fw.version_code <= currentFirmwareVersionCode;
+                                            const isCurrent = currentFirmwareVersionCode !== null && 
+                                                fw.version_code === currentFirmwareVersionCode;
+                                            
+                                            return (
+                                                <MenuItem 
+                                                    key={fw.version} 
+                                                    value={fw.version}
+                                                    disabled={isOlderOrEqual}
+                                                    sx={isOlderOrEqual ? { color: 'text.disabled' } : {}}
+                                                >
+                                                    {fw.version} {fw.version_code && `(code: ${fw.version_code})`} - {(fw.size / 1024).toFixed(0)} KB
+                                                    {isCurrent && ' ✓ aktualna'}
+                                                    {isOlderOrEqual && !isCurrent && ' (starsza wersja)'}
+                                                </MenuItem>
+                                            );
+                                        })}
                                     </Select>
                                 </FormControl>
                                 
@@ -986,7 +1051,11 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                     color="primary"
                                     startIcon={<CloudUploadIcon />}
                                     onClick={handleDeployFirmware}
-                                    disabled={otaLoading || !selectedFirmware}
+                                    disabled={otaLoading || !selectedFirmware || (
+                                        currentFirmwareVersionCode !== null && 
+                                        firmwareList.find(fw => fw.version === selectedFirmware)?.version_code !== undefined &&
+                                        (firmwareList.find(fw => fw.version === selectedFirmware)?.version_code ?? 0) <= currentFirmwareVersionCode
+                                    )}
                                 >
                                     {otaLoading ? <CircularProgress size={24} /> : 'Rozpocznij aktualizację'}
                                 </Button>
@@ -1001,10 +1070,24 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 </Button>
                             </Stack>
                             
+                            {firmwareList.length > 0 && currentFirmwareVersionCode !== null && 
+                             !firmwareList.some(fw => (fw.version_code ?? 0) > currentFirmwareVersionCode) && (
+                                <Alert severity="success">
+                                    Urządzenie ma zainstalowaną najnowszą wersję firmware.
+                                </Alert>
+                            )}
+                            
                             {firmwareList.length === 0 && (
                                 <Typography variant="body2" color="text.secondary">
                                     Brak dostępnych wersji firmware. Prześlij firmware w panelu administracyjnym.
                                 </Typography>
+                            )}
+                            
+                            {!currentFirmwareVersion && firmwareList.length > 0 && (
+                                <Alert severity="warning">
+                                    Nie można określić aktualnej wersji firmware urządzenia. 
+                                    Upewnij się, że urządzenie wysyła telemetrię.
+                                </Alert>
                             )}
                         </Stack>
                     </Collapse>

@@ -84,6 +84,7 @@ class DeviceTelemetryRead(BaseModel):
     min_heap: int = 0
     total_heap: int = 0
     firmware_version: Optional[str] = None
+    firmware_version_code: Optional[int] = None
     idf_version: Optional[str] = None
     chip_type: Optional[str] = None
     chip_revision: Optional[int] = None
@@ -131,6 +132,7 @@ class DeviceTelemetrySummary(BaseModel):
     
     # Quick status
     firmware_version: Optional[str] = None
+    firmware_version_code: Optional[int] = None
     wifi_connected: bool = False
     wifi_rssi: Optional[int] = None
     mqtt_connected: bool = False

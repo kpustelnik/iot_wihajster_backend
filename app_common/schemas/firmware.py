@@ -74,6 +74,8 @@ class OtaDeployResponse(BaseModel):
     device_id: int
     version: str
     version_code: Optional[int] = None
+    current_version: Optional[str] = None
+    current_version_code: Optional[int] = None
     download_url: Optional[str] = None
     sha256: Optional[str] = None
 
@@ -86,6 +88,17 @@ class FirmwareUpdateCheck(BaseModel):
     latest_version: Optional[str] = None
     latest_version_code: Optional[int] = None
     latest_info: Optional[FirmwareInfo] = None
+    message: Optional[str] = None
+
+
+class AvailableUpdatesResponse(BaseModel):
+    """Lista dostępnych aktualizacji firmware dla urządzenia."""
+    device_id: int
+    chip_type: str
+    current_version: Optional[str] = None
+    current_version_code: Optional[int] = None
+    available_updates: List[FirmwareInfo] = Field(default_factory=list, description="Lista wersji firmware, do których można zaktualizować (wyższe niż aktualna)")
+    count: int = 0
     message: Optional[str] = None
 
 
