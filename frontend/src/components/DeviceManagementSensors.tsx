@@ -187,7 +187,7 @@ export default function DeviceManagementSensors({ server }: {
               <Typography>Battery Percent: {batteryPercent.toFixed(2)} %</Typography>
             ) : null }
             { (gpsLatitude !== null && gpsLongitude !== null) ? (
-              <Typography>📍 Location: {gpsLatitude.toFixed(6)}°, {gpsLongitude.toFixed(6)}°</Typography>
+              <Typography>Location: {gpsLatitude.toFixed(6)}°, {gpsLongitude.toFixed(6)}°</Typography>
             ) : null }
 
             {/* Settings section */}

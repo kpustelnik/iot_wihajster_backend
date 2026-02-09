@@ -763,7 +763,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                             disabled={commandLoading}
                                         >
                                             <MenuItem value="off">Wyłączone</MenuItem>
-                                            <MenuItem value="solid">Stały</MenuItem>
+                                            <MenuItem value="static">Stały</MenuItem>
                                             <MenuItem value="blink">Miganie</MenuItem>
                                             <MenuItem value="breath">Oddech</MenuItem>
                                         </Select>
