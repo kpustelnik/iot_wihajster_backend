@@ -92,10 +92,20 @@ export default function DeviceManagementInfo({ server, setServer }: {
             {otaStatus && (
               <Box>
                 <Typography>
-                  OTA: {otaStatus.result === 0 ? 'Idle' : otaStatus.result === 1 ? 'In progress' : otaStatus.result === 2 ? 'Success' : `Error (${otaStatus.result})`}
-                  {otaStatus.result === 1 && ` — ${otaStatus.progress}%`}
+                  OTA: {
+                    otaStatus.result === 0 ? 'Idle' :
+                    otaStatus.result === 1 ? 'Success' :
+                    otaStatus.result === 2 ? `In progress — ${otaStatus.progress}%` :
+                    otaStatus.result === 3 ? 'Error: Connection failed' :
+                    otaStatus.result === 4 ? 'Error: Download failed' :
+                    otaStatus.result === 5 ? 'Error: Invalid image' :
+                    otaStatus.result === 6 ? 'Error: Verify failed' :
+                    otaStatus.result === 7 ? 'Error: Flash failed' :
+                    otaStatus.result === 8 ? 'Cancelled' :
+                    `Unknown (${otaStatus.result})`
+                  }
                 </Typography>
-                {otaStatus.result === 1 && (
+                {otaStatus.result === 2 && (
                   <LinearProgress variant="determinate" value={otaStatus.progress} sx={{ mt: 0.5, mb: 1, borderRadius: 1 }} />
                 )}
               </Box>
