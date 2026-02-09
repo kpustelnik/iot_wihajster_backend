@@ -616,6 +616,11 @@ async def process_config_response_message(topic: str, payload: str):
             config = data.get("config", {})
             logger.info(f"[MQTT] Received config from device {device_id}")
             await _resolve_pending_response(device_id, "get_config", data)
+        
+        elif command == "request_config_sync":
+            # Device is requesting a config sync (sent after every telemetry publish)
+            logger.info(f"[MQTT] Device {device_id} requested config_sync")
+            await send_settings_sync(device_id)
             
     except Exception as e:
         logger.error(f"[MQTT] Error processing config response: {e!r}")
