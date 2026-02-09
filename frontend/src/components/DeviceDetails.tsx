@@ -238,6 +238,25 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
         return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
     };
 
+    const formatChartTick = (ts: number) => {
+        const date = new Date(ts);
+        switch (timescale) {
+            case Timescale.LIVE:
+            case Timescale.HOUR:
+            case Timescale.HOURS_6:
+                return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+            case Timescale.DAY:
+                return date.toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            case Timescale.WEEK:
+            case Timescale.MONTH:
+                return date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
+            case Timescale.YEAR:
+                return date.toLocaleDateString('pl-PL', { month: 'short', year: '2-digit' });
+            default:
+                return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+        }
+    };
+
     const prepareChartData = () => {
         return [...measurements]
             .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
@@ -576,8 +595,8 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                             type="number"
                                             scale="time"
                                             domain={['dataMin', 'dataMax']}
-                                            tickFormatter={(ts: number) => new Date(ts).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
-                                            tick={{ fontSize: 12 }}
+                                            tickFormatter={formatChartTick}
+                                            tick={{ fontSize: 11 }}
                                             stroke="#6b7280"
                                         />
                                         <YAxis
@@ -642,8 +661,8 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                             type="number"
                                             scale="time"
                                             domain={['dataMin', 'dataMax']}
-                                            tickFormatter={(ts: number) => new Date(ts).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
-                                            tick={{ fontSize: 12 }}
+                                            tickFormatter={formatChartTick}
+                                            tick={{ fontSize: 11 }}
                                             stroke="#6b7280"
                                         />
                                         <YAxis
@@ -698,8 +717,8 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                             type="number"
                                             scale="time"
                                             domain={['dataMin', 'dataMax']}
-                                            tickFormatter={(ts: number) => new Date(ts).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
-                                            tick={{ fontSize: 12 }}
+                                            tickFormatter={formatChartTick}
+                                            tick={{ fontSize: 11 }}
                                             stroke="#6b7280"
                                         />
                                         <YAxis

@@ -149,7 +149,12 @@ export default function SensorHistory({ deviceId }: SensorHistoryProps) {
     const xTicks = 6;
     const formatTime = (date: Date) => {
       if (timeRange > 86400000 * 2) {
+        // > 2 days: show date only
         return date.toLocaleDateString("pl-PL", { day: "numeric", month: "short" });
+      }
+      if (timeRange > 21600000) {
+        // > 6 hours: show date + time
+        return date.toLocaleString("pl-PL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
       }
       return date.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
     };
