@@ -37,7 +37,7 @@ export default function DeviceManagement({ server, setServer }: {
       <Button variant="contained" sx={{ mt: 1 }} onClick={() => server.disconnect()}>Disconnect</Button>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={tab} onChange={(e, value) => setTab(value)}>
+        <Tabs value={tab} onChange={(e, value) => setTab(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
           <Tab label="Informations" />
           <Tab label="WiFi Configuration" />
           <Tab label="Sensors" />

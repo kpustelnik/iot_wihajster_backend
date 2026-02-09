@@ -43,7 +43,8 @@ export default function Sidebar({ isVisible, content, selectedDevice, onToggle, 
     const muiTheme = useTheme();
     const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
     
-    const sidebarWidth = isMobile ? '100vw' : SIDEBAR_WIDTH;
+    const leftOffset = isLeftSidebarVisible ? LEFT_SIDEBAR_WIDTH : 0;
+    const sidebarWidth = isMobile ? `calc(100vw - ${leftOffset}px)` : SIDEBAR_WIDTH;
 
     const renderContent = () => {
         switch (content) {
@@ -133,8 +134,6 @@ export default function Sidebar({ isVisible, content, selectedDevice, onToggle, 
         return null;
     }
 
-    const leftOffset = isLeftSidebarVisible && !isMobile ? LEFT_SIDEBAR_WIDTH : 0;
-
     return (
         <>
             <Fade in={isVisible}>
@@ -142,10 +141,10 @@ export default function Sidebar({ isVisible, content, selectedDevice, onToggle, 
                     elevation={4}
                     sx={{
                         position: 'fixed',
-                        left: isMobile ? 0 : leftOffset,
+                        left: leftOffset,
                         top: 0,
                         width: sidebarWidth,
-                        maxWidth: isMobile ? '100vw' : `calc(100vw - ${leftOffset}px)`,
+                        maxWidth: `calc(100vw - ${leftOffset}px)`,
                         height: '100vh',
                         overflowY: 'auto',
                         overflowX: 'hidden',

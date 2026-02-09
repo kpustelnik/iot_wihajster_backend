@@ -49,6 +49,7 @@ import * as controlApi from '@/lib/api/control';
 import * as firmwareApi from '@/lib/api/firmware';
 import type { MeasurementModel, DeviceModel } from '@/lib/api/schemas';
 import { Timescale } from '@/lib/api/schemas';
+import DeviceSettings from './DeviceSettings';
 
 interface DeviceDetailsProps {
     device: DeviceModel;
@@ -100,38 +101,37 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
 
     const fetchFirmwareList = async () => {
         try {
-            // Pobierz aktualną wersję urządzenia i dostępne aktualizacje
+            // Pobierz dostępne aktualizacje (endpoint zwraca tylko wersje wyższe niż obecna)
             const availableResponse = await firmwareApi.getAvailableUpdates(device.id);
             const curVersion = availableResponse.current_version || null;
             const curVersionCode = availableResponse.current_version_code ?? null;
             setCurrentFirmwareVersion(curVersion);
             setCurrentFirmwareVersionCode(curVersionCode);
             
-            // Użyj available_updates jako głównego źródła listy firmware do aktualizacji
+            // available_updates to jedyne sensowne źródło - zawiera tylko nowsze wersje
             const availableUpdates = availableResponse.available_updates || [];
+            setFirmwareList(availableUpdates);
             
-            // Pobierz też pełną listę firmware (dla kontekstu)
-            let allFirmwares: firmwareApi.FirmwareInfo[] = [];
-            try {
-                const allFirmwareResponse = await firmwareApi.listFirmware();
-                allFirmwares = allFirmwareResponse.firmwares || [];
-            } catch {
-                console.warn('Failed to fetch full firmware list, using available_updates only');
-            }
-            
-            // Użyj pełnej listy jeśli dostępna, inaczej available_updates
-            const firmwares = allFirmwares.length > 0 ? allFirmwares : availableUpdates;
-            setFirmwareList(firmwares);
-            
-            // Domyślnie wybierz najnowszą wersję dostępną do aktualizacji
+            // Domyślnie wybierz najnowszą wersję
             if (availableUpdates.length > 0) {
                 setSelectedFirmware(availableUpdates[0].version);
+                // Auto-expand sekcję OTA gdy jest dostępna aktualizacja
+                setOtaExpanded(true);
+                
+                setUpdateAvailable({
+                    update_available: true,
+                    current_version: curVersion || 'unknown',
+                    latest_version: availableUpdates[0].version,
+                    latest_version_code: availableUpdates[0].version_code,
+                    latest_info: availableUpdates[0]
+                });
             } else {
                 setSelectedFirmware('');
+                setUpdateAvailable({
+                    update_available: false,
+                    current_version: curVersion || 'unknown',
+                });
             }
-            
-            // Sprawdź aktualizacje z poprawnymi danymi wersji
-            await checkForUpdates(curVersionCode, curVersion);
         } catch (error) {
             console.error('Failed to fetch firmware list:', error);
             // Fallback - pobierz tylko listę wszystkich wersji
@@ -144,29 +144,6 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
             } catch (fallbackError) {
                 console.error('Failed to fetch firmware list (fallback):', fallbackError);
             }
-        }
-    };
-
-    const checkForUpdates = async (knownVersionCode?: number | null, knownVersion?: string | null) => {
-        try {
-            // Try to get latest firmware to show available update
-            const latest = await firmwareApi.getLatestFirmware('esp32c6');
-            if (latest) {
-                // Use passed-in values or fall back to state
-                const latestVersionCode = latest.version_code ?? 0;
-                const currentCode = knownVersionCode ?? currentFirmwareVersionCode ?? 0;
-                const currentVer = knownVersion ?? currentFirmwareVersion ?? 'unknown';
-                const isUpdateAvailable = latestVersionCode > currentCode;
-                
-                setUpdateAvailable({
-                    update_available: isUpdateAvailable,
-                    current_version: currentVer,
-                    latest_version: latest.version,
-                    latest_info: latest
-                });
-            }
-        } catch (error) {
-            console.error('Failed to check for updates:', error);
         }
     };
 
@@ -1024,6 +1001,9 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                 </CardContent>
             </Card> */}
 
+            {/* Device Settings (MQTT) */}
+            <DeviceSettings deviceId={device.id} />
+
             {/* OTA Firmware Update Card */}
             <Card sx={{ mt: 3 }}>
                 <CardContent>
@@ -1037,15 +1017,34 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                         <Typography variant="h6">
                             <SystemUpdateAltIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
                             Aktualizacja firmware (OTA)
+                            {updateAvailable?.update_available && (
+                                <Chip label="Aktualizacja dostępna" color="info" size="small" sx={{ ml: 1, verticalAlign: 'middle' }} />
+                            )}
                         </Typography>
                         <IconButton size="small">
                             {otaExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                         </IconButton>
                     </Stack>
                     
-                    {updateAvailable?.update_available && (
-                        <Alert severity="info" sx={{ mt: 2 }}>
-                            Najnowsza dostępna wersja firmware: <strong>{updateAvailable.latest_version}</strong>
+                    {updateAvailable?.update_available && selectedFirmware && (
+                        <Alert 
+                            severity="info" 
+                            sx={{ mt: 2 }}
+                            action={
+                                <Button 
+                                    color="inherit" 
+                                    size="small" 
+                                    variant="outlined"
+                                    onClick={(e) => { e.stopPropagation(); handleDeployFirmware(); }}
+                                    disabled={otaLoading}
+                                    startIcon={otaLoading ? <CircularProgress size={16} /> : <CloudUploadIcon />}
+                                >
+                                    Aktualizuj
+                                </Button>
+                            }
+                        >
+                            {currentFirmwareVersion && <>Aktualna: <strong>{currentFirmwareVersion}</strong> → </>}
+                            Dostępna: <strong>{updateAvailable.latest_version}</strong>
                         </Alert>
                     )}
                     
@@ -1055,7 +1054,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                             {currentFirmwareVersion && (
                                 <Typography variant="body2">
                                     Aktualna wersja firmware: <strong>{currentFirmwareVersion}</strong>
-                                    {currentFirmwareVersionCode && ` (code: ${currentFirmwareVersionCode})`}
+                                    {currentFirmwareVersionCode !== null && currentFirmwareVersionCode !== undefined && ` (code: ${currentFirmwareVersionCode})`}
                                 </Typography>
                             )}
                             
@@ -1075,26 +1074,15 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                         onChange={(e) => setSelectedFirmware(e.target.value)}
                                         disabled={otaLoading || firmwareList.length === 0}
                                     >
-                                        {firmwareList.map((fw) => {
-                                            const isOlderOrEqual = currentFirmwareVersionCode !== null && 
-                                                fw.version_code !== undefined && 
-                                                fw.version_code <= currentFirmwareVersionCode;
-                                            const isCurrent = currentFirmwareVersionCode !== null && 
-                                                fw.version_code === currentFirmwareVersionCode;
-                                            
-                                            return (
-                                                <MenuItem 
-                                                    key={fw.version} 
-                                                    value={fw.version}
-                                                    disabled={isOlderOrEqual}
-                                                    sx={isOlderOrEqual ? { color: 'text.disabled' } : {}}
-                                                >
-                                                    {fw.version} {fw.version_code && `(code: ${fw.version_code})`} - {(fw.size / 1024).toFixed(0)} KB
-                                                    {isCurrent && ' ✓ aktualna'}
-                                                    {isOlderOrEqual && !isCurrent && ' (starsza wersja)'}
-                                                </MenuItem>
-                                            );
-                                        })}
+                                        {firmwareList.map((fw) => (
+                                            <MenuItem 
+                                                key={fw.version} 
+                                                value={fw.version}
+                                            >
+                                                {fw.version} (code: {fw.version_code}) — {(fw.size / 1024).toFixed(0)} KB
+                                                {fw.release_notes && ` — ${fw.release_notes}`}
+                                            </MenuItem>
+                                        ))}
                                     </Select>
                                 </FormControl>
                                 
@@ -1103,11 +1091,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                     color="primary"
                                     startIcon={<CloudUploadIcon />}
                                     onClick={handleDeployFirmware}
-                                    disabled={otaLoading || !selectedFirmware || (
-                                        currentFirmwareVersionCode !== null && 
-                                        firmwareList.find(fw => fw.version === selectedFirmware)?.version_code !== undefined &&
-                                        (firmwareList.find(fw => fw.version === selectedFirmware)?.version_code ?? 0) <= currentFirmwareVersionCode
-                                    )}
+                                    disabled={otaLoading || !selectedFirmware}
                                 >
                                     {otaLoading ? <CircularProgress size={24} /> : 'Rozpocznij aktualizację'}
                                 </Button>
@@ -1122,16 +1106,15 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 </Button>
                             </Stack>
                             
-                            {firmwareList.length > 0 && currentFirmwareVersionCode !== null && 
-                             !firmwareList.some(fw => (fw.version_code ?? 0) > currentFirmwareVersionCode) && (
+                            {firmwareList.length === 0 && updateAvailable && !updateAvailable.update_available && (
                                 <Alert severity="success">
                                     Urządzenie ma zainstalowaną najnowszą wersję firmware.
                                 </Alert>
                             )}
                             
-                            {firmwareList.length === 0 && (
+                            {firmwareList.length === 0 && !updateAvailable && (
                                 <Typography variant="body2" color="text.secondary">
-                                    Brak dostępnych wersji firmware. Prześlij firmware w panelu administracyjnym.
+                                    Ładowanie listy firmware...
                                 </Typography>
                             )}
                             
