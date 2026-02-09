@@ -676,7 +676,7 @@ export default function Dashboard({ deviceId }: DashboardProps) {
                 <DialogContent>
                     <DialogContentText>
                         Czy na pewno chcesz zwolnić to urządzenie? Po zwolnieniu będzie mogło być przypisane do innego konta.
-                        Pamiętaj o wykonaniu resetu fabrycznego (przytrzymaj przycisk BOOT przez 10 sekund).
+                        Pamiętaj o wykonaniu resetu fabrycznego (przyciśnij dwukrotnie przycisk).
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>

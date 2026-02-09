@@ -100,22 +100,33 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
 
     const fetchFirmwareList = async () => {
         try {
-            // Pobierz aktualną wersję urządzenia z getAvailableUpdates
+            // Pobierz aktualną wersję urządzenia i dostępne aktualizacje
             const availableResponse = await firmwareApi.getAvailableUpdates(device.id);
             const curVersion = availableResponse.current_version || null;
-            const curVersionCode = availableResponse.current_version_code || null;
+            const curVersionCode = availableResponse.current_version_code ?? null;
             setCurrentFirmwareVersion(curVersion);
             setCurrentFirmwareVersionCode(curVersionCode);
             
-            // Pobierz wszystkie wersje firmware (włącznie ze starszymi)
-            const allFirmwareResponse = await firmwareApi.listFirmware();
-            setFirmwareList(allFirmwareResponse.firmwares || []);
+            // Użyj available_updates jako głównego źródła listy firmware do aktualizacji
+            const availableUpdates = availableResponse.available_updates || [];
+            
+            // Pobierz też pełną listę firmware (dla kontekstu)
+            let allFirmwares: firmwareApi.FirmwareInfo[] = [];
+            try {
+                const allFirmwareResponse = await firmwareApi.listFirmware();
+                allFirmwares = allFirmwareResponse.firmwares || [];
+            } catch {
+                console.warn('Failed to fetch full firmware list, using available_updates only');
+            }
+            
+            // Użyj pełnej listy jeśli dostępna, inaczej available_updates
+            const firmwares = allFirmwares.length > 0 ? allFirmwares : availableUpdates;
+            setFirmwareList(firmwares);
             
             // Domyślnie wybierz najnowszą wersję dostępną do aktualizacji
-            if (availableResponse.available_updates?.length > 0) {
-                setSelectedFirmware(availableResponse.available_updates[0].version);
-            } else if (allFirmwareResponse.firmwares?.length > 0) {
-                // Jeśli brak nowszych wersji, nie wybieraj nic
+            if (availableUpdates.length > 0) {
+                setSelectedFirmware(availableUpdates[0].version);
+            } else {
                 setSelectedFirmware('');
             }
             
@@ -613,6 +624,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                             label={{ value: '%', angle: 90, position: 'insideRight' }}
                                         />
                                         <Tooltip
+                                            labelFormatter={(ts: number) => new Date(ts).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                             contentStyle={{
                                                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                                 border: '1px solid #e5e7eb',
@@ -671,6 +683,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                             label={{ value: 'μg/m³', angle: -90, position: 'insideLeft' }}
                                         />
                                         <Tooltip
+                                            labelFormatter={(ts: number) => new Date(ts).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                             contentStyle={{
                                                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                                 border: '1px solid #e5e7eb',
@@ -727,6 +740,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                             label={{ value: 'hPa', angle: -90, position: 'insideLeft' }}
                                         />
                                         <Tooltip
+                                            labelFormatter={(ts: number) => new Date(ts).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                             contentStyle={{
                                                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                                 border: '1px solid #e5e7eb',
@@ -750,7 +764,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                 </Stack>
             )}
 
-            {/* MQTT Control Panel */}
+            {/* MQTT Control Panel
             <Card sx={{ mt: 3 }}>
                 <CardContent>
                     <Stack 
@@ -771,7 +785,6 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                     <Collapse in={controlExpanded}>
                         <Divider sx={{ my: 2 }} />
                         <Grid container spacing={3}>
-                            {/* LED Brightness */}
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <Typography gutterBottom>💡 Jasność LED: {ledBrightness}%</Typography>
                                 <Stack direction="row" spacing={2} alignItems="center">
@@ -794,7 +807,6 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 </Stack>
                             </Grid>
 
-                            {/* LED Mode */}
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <Typography gutterBottom>🎨 Tryb LED</Typography>
                                 <Stack direction="row" spacing={2} alignItems="center">
@@ -823,7 +835,6 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 </Stack>
                             </Grid>
 
-                            {/* LED Color */}
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <Typography gutterBottom>🌈 Kolor LED (RGB)</Typography>
                                 <Stack direction="row" spacing={1} alignItems="center">
@@ -878,7 +889,6 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 </Stack>
                             </Grid>
 
-                            {/* Sensor Interval */}
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <Typography gutterBottom>⏱️ Interwał pomiarów: {sensorInterval / 1000}s</Typography>
                                 <Stack direction="row" spacing={2} alignItems="center">
@@ -902,7 +912,6 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 </Stack>
                             </Grid>
 
-                            {/* BMP280 Settings */}
                             <Grid size={{ xs: 12 }}>
                                 <Divider sx={{ my: 1 }} />
                                 <Typography variant="subtitle2" gutterBottom>🌡️ Ustawienia BMP280</Typography>
@@ -983,7 +992,6 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 </Stack>
                             </Grid>
 
-                            {/* Action Buttons */}
                             <Grid size={{ xs: 12 }}>
                                 <Divider sx={{ my: 1 }} />
                                 <Stack direction="row" spacing={2} flexWrap="wrap">
@@ -1014,7 +1022,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                         )}
                     </Collapse>
                 </CardContent>
-            </Card>
+            </Card> */}
 
             {/* OTA Firmware Update Card */}
             <Card sx={{ mt: 3 }}>
@@ -1157,7 +1165,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                         </Button>
                     </Stack>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                        Po zwolnieniu urządzenia wykonaj na nim factory reset (przytrzymaj przycisk BOOT przez 10 sekund).
+                        Po zwolnieniu urządzenia wykonaj na nim factory reset (przyciśnij dwukrotnie przycisk).
                     </Typography>
                 </CardContent>
             </Card>
@@ -1171,7 +1179,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                         <br /><br />
                         Po zwolnieniu urządzenie nie będzie już przypisane do Twojego konta.
                         Aby ponownie je przypisać, musisz wykonać factory reset na urządzeniu
-                        (przytrzymaj przycisk BOOT przez 10 sekund) i ponownie połączyć przez Bluetooth.
+                        (przyciśnij dwukrotnie przycisk) i ponownie połączyć przez Bluetooth.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
