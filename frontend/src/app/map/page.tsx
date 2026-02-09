@@ -8,6 +8,7 @@ import LeftSidebar, { MenuOption } from '@/components/LeftSidebar';
 import Sidebar from '@/components/Sidebar';
 import ThemeToggle from '@/components/ThemeToggle';
 import { authUtils } from '@/lib/auth';
+import { basePath } from '@/lib/navigation';
 import type { DeviceModel } from '@/lib/api/schemas';
 
 // Dynamically import Map component to avoid SSR issues with Leaflet
@@ -49,7 +50,7 @@ function MapPageContent() {
             // Save auth data from Discord OAuth
             authUtils.saveAuth(discordToken, parseInt(discordUserId, 10));
             // Clean URL by removing query params
-            window.history.replaceState({}, '', '/map');
+            window.history.replaceState({}, '', `${basePath}/map`);
             setIsAuthenticated(true);
             return;
         }

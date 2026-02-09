@@ -146,15 +146,6 @@ export default function Home() {
                                         Przejdź do mapy
                                     </Button>
                                 </Link>
-                                <Link href="/device/connect" passHref>
-                                    <Button 
-                                        variant="outlined" 
-                                        size="large"
-                                        startIcon={<DevicesIcon />}
-                                    >
-                                        Dodaj urządzenie
-                                    </Button>
-                                </Link>
                             </Stack>
                         </Grid>
                         <Grid size={{ xs: 12, md: 5 }}>

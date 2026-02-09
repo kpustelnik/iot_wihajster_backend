@@ -145,11 +145,14 @@ export default function Sidebar({ isVisible, content, selectedDevice, onToggle, 
                         left: isMobile ? 0 : leftOffset,
                         top: 0,
                         width: sidebarWidth,
+                        maxWidth: isMobile ? '100vw' : `calc(100vw - ${leftOffset}px)`,
                         height: '100vh',
                         overflowY: 'auto',
+                        overflowX: 'hidden',
                         zIndex: 1100,
                         borderRadius: 0,
                         display: isVisible ? 'block' : 'none',
+                        boxSizing: 'border-box',
                     }}
                 >
                     {/* Mobile close button */}

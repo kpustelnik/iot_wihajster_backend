@@ -10,6 +10,7 @@ import {
     Alert,
 } from "@mui/material";
 import { authUtils } from "@/lib/auth";
+import { basePath } from "@/lib/navigation";
 
 function DiscordCallbackContent() {
     const router = useRouter();
@@ -55,7 +56,7 @@ function DiscordCallbackContent() {
                         {error}
                     </Alert>
                     <Typography variant="body2" color="text.secondary" align="center">
-                        <a href="/login" style={{ color: "#1976d2", textDecoration: "none" }}>
+                        <a href={`${basePath}/login`} style={{ color: "#1976d2", textDecoration: "none" }}>
                             Wróć do logowania
                         </a>
                     </Typography>

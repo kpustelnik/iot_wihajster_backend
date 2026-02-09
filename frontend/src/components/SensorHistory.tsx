@@ -84,7 +84,8 @@ export default function SensorHistory({ deviceId }: SensorHistoryProps) {
       }
       
       return { date, value };
-    }).filter((d) => d.value !== undefined);
+    }).filter((d) => d.value !== undefined)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
   const metrics = [

@@ -102,8 +102,10 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
         try {
             // Pobierz aktualną wersję urządzenia z getAvailableUpdates
             const availableResponse = await firmwareApi.getAvailableUpdates(device.id);
-            setCurrentFirmwareVersion(availableResponse.current_version || null);
-            setCurrentFirmwareVersionCode(availableResponse.current_version_code || null);
+            const curVersion = availableResponse.current_version || null;
+            const curVersionCode = availableResponse.current_version_code || null;
+            setCurrentFirmwareVersion(curVersion);
+            setCurrentFirmwareVersionCode(curVersionCode);
             
             // Pobierz wszystkie wersje firmware (włącznie ze starszymi)
             const allFirmwareResponse = await firmwareApi.listFirmware();
@@ -116,6 +118,9 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                 // Jeśli brak nowszych wersji, nie wybieraj nic
                 setSelectedFirmware('');
             }
+            
+            // Sprawdź aktualizacje z poprawnymi danymi wersji
+            await checkForUpdates(curVersionCode, curVersion);
         } catch (error) {
             console.error('Failed to fetch firmware list:', error);
             // Fallback - pobierz tylko listę wszystkich wersji
@@ -131,14 +136,20 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
         }
     };
 
-    const checkForUpdates = async () => {
+    const checkForUpdates = async (knownVersionCode?: number | null, knownVersion?: string | null) => {
         try {
             // Try to get latest firmware to show available update
             const latest = await firmwareApi.getLatestFirmware('esp32c6');
             if (latest) {
+                // Use passed-in values or fall back to state
+                const latestVersionCode = latest.version_code ?? 0;
+                const currentCode = knownVersionCode ?? currentFirmwareVersionCode ?? 0;
+                const currentVer = knownVersion ?? currentFirmwareVersion ?? 'unknown';
+                const isUpdateAvailable = latestVersionCode > currentCode;
+                
                 setUpdateAvailable({
-                    update_available: true,
-                    current_version: currentFirmwareVersion || 'unknown',
+                    update_available: isUpdateAvailable,
+                    current_version: currentVer,
                     latest_version: latest.version,
                     latest_info: latest
                 });
@@ -215,7 +226,6 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
         fetchLatestReading();
         fetchMeasurements();
         fetchFirmwareList();
-        checkForUpdates();
         
         // Auto-refresh latest reading every 30 seconds
         const interval = setInterval(fetchLatestReading, 30000);
@@ -229,14 +239,17 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
     };
 
     const prepareChartData = () => {
-        return measurements.map(m => ({
-            time: formatTime(m.time),
-            humidity: m.humidity,
-            temperature: m.temperature,
-            pressure: m.pressure,
-            pm25: m.PM25,
-            pm10: m.PM10,
-        }));
+        return [...measurements]
+            .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+            .map(m => ({
+                timestamp: new Date(m.time).getTime(),
+                time: formatTime(m.time),
+                humidity: m.humidity,
+                temperature: m.temperature,
+                pressure: m.pressure,
+                pm25: m.PM25,
+                pm10: m.PM10,
+            }));
     };
 
     const handleTimescaleChange = (_: React.MouseEvent<HTMLElement>, newTimescale: Timescale | null) => {
@@ -559,7 +572,11 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                     <LineChart data={chartData}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                                         <XAxis
-                                            dataKey="time"
+                                            dataKey="timestamp"
+                                            type="number"
+                                            scale="time"
+                                            domain={['dataMin', 'dataMax']}
+                                            tickFormatter={(ts: number) => new Date(ts).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
                                             tick={{ fontSize: 12 }}
                                             stroke="#6b7280"
                                         />
@@ -621,7 +638,11 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                     <LineChart data={chartData}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                                         <XAxis
-                                            dataKey="time"
+                                            dataKey="timestamp"
+                                            type="number"
+                                            scale="time"
+                                            domain={['dataMin', 'dataMax']}
+                                            tickFormatter={(ts: number) => new Date(ts).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
                                             tick={{ fontSize: 12 }}
                                             stroke="#6b7280"
                                         />
@@ -673,7 +694,11 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                     <LineChart data={chartData}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                                         <XAxis
-                                            dataKey="time"
+                                            dataKey="timestamp"
+                                            type="number"
+                                            scale="time"
+                                            domain={['dataMin', 'dataMax']}
+                                            tickFormatter={(ts: number) => new Date(ts).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
                                             tick={{ fontSize: 12 }}
                                             stroke="#6b7280"
                                         />
@@ -1063,7 +1088,7 @@ export default function DeviceDetails({ device, onDeviceReleased }: DeviceDetail
                                 <Button
                                     variant="outlined"
                                     startIcon={<RefreshIcon />}
-                                    onClick={() => { fetchFirmwareList(); checkForUpdates(); }}
+                                    onClick={() => { fetchFirmwareList(); }}
                                     disabled={otaLoading}
                                 >
                                     Odśwież listę

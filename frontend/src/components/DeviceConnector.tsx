@@ -7,6 +7,7 @@ import BLECharacteristicEnum from "@/lib/BLECharacteristicEnum";
 import BLEServiceEnum, { AdvertisedServices, OptionalServices } from "@/lib/BLEServiceEnum";
 import { BluetoothQueueContext } from "@/components/BluetoothQueueProvider";
 import { useSnackbar } from "@/contexts/SnackbarContext";
+import { saveFastConnectToken, getFastConnectToken, hasFastConnectTokens, clearAllFastConnectTokens, macBytesToString } from "@/lib/fastConnectStorage";
 
 import axios from '@/lib/AxiosClient';
 
@@ -31,7 +32,17 @@ export default function DeviceConnector({
   const [pin, setPin] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [bindingStatus, setBindingStatus] = useState<number | null>(null); // 0=ok, 1=newly bound, 2=rejected
+  const [hasStoredTokens, setHasStoredTokens] = useState<boolean>(false);
+  const [isFastConnect, setIsFastConnect] = useState<boolean>(false);
   
+  // Ref to hold the encrypted characteristic for polling from the step 5 button
+  const encryptedCharRef = React.useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+  
+  // Check for stored fast connect tokens on mount
+  React.useEffect(() => {
+    setHasStoredTokens(hasFastConnectTokens());
+  }, []);
+
   // Internal state for standalone mode
   const [internalServer, setInternalServer] = useState<BluetoothRemoteGATTServer | null>(null);
   const [, setInternalSettingsOpen] = useState<boolean>(false);
@@ -60,6 +71,7 @@ export default function DeviceConnector({
     setIsConnecting(true);
     // Reset binding status for new connection attempt
     setBindingStatus(null);
+    setIsFastConnect(false);
     
     try {
       const device: BluetoothDevice | null = await navigator.bluetooth.requestDevice({
@@ -94,15 +106,28 @@ export default function DeviceConnector({
       setStep(1);
 
       const basicInfoService = await bluetoothQueueContext.enqueue(async () => deviceServer.getPrimaryService(BLEServiceEnum.BASIC_INFO_SERVICE));
-      const deviceCommunicationEncryptedCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_COMMUNICATION_ENCRYPTED));
+      
+      // Read encrypted status, MAC and fast connect token ID in parallel for speed
+      const [deviceCommunicationEncryptedCharacteristic, deviceMacCharacteristic, tokenIdCharacteristic] = await Promise.all([
+        bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_COMMUNICATION_ENCRYPTED)),
+        bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_MAC)),
+        bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.FASTCONNECT_TOKEN_ID)),
+      ]);
+      encryptedCharRef.current = deviceCommunicationEncryptedCharacteristic;
+
+      const [encryptedValue, macValue, tokenIdValue] = await Promise.all([
+        bluetoothQueueContext.enqueue(() => deviceCommunicationEncryptedCharacteristic.readValue()),
+        bluetoothQueueContext.enqueue(() => deviceMacCharacteristic.readValue()),
+        bluetoothQueueContext.enqueue(() => tokenIdCharacteristic.readValue()),
+      ]);
 
       // Check if the connection is already encrypted
-      const encryptedValue = await bluetoothQueueContext.enqueue(() => deviceCommunicationEncryptedCharacteristic.readValue());
-      const isEncrypted = encryptedValue.getUint8(0) === 1;
+      const encryptedIndicator = encryptedValue.getUint8(0);
+      const isEncrypted = encryptedIndicator === 1;
+      const isUnencryptedBLEMode = encryptedIndicator === 2;
       if (isEncrypted) {
         setStep(6);
-        // Connection was already secured - device was bound previously, don't show binding message
-        setBindingStatus(-1); // -1 = already connected, no binding message needed
+        setBindingStatus(-1);
         showSuccess('Connection already secured!');
         if (onDeviceConnected) {
           onDeviceConnected();
@@ -110,6 +135,35 @@ export default function DeviceConnector({
         return;
       }
 
+      // --- Fast Connect attempt ---
+      // Fast Connect skips the entire server-mediated auth flow. The device uses the
+      // stored fast_connect_token as the BLE GAP passkey. The frontend just needs to
+      // display the saved PIN and trigger BLE pairing (by reading an encrypted characteristic).
+      const deviceMac = macBytesToString(macValue);
+      const deviceTokenId = tokenIdValue.getUint32(0, true);
+
+      if (deviceTokenId !== 0) {
+        const stored = getFastConnectToken(deviceMac);
+        if (stored && stored.tokenId === deviceTokenId) {
+          showInfo('Fast Connect — saved credentials found.');
+          setBindingStatus(-1);
+
+          if (isUnencryptedBLEMode) {
+            setStep(6);
+            if (onDeviceConnected) onDeviceConnected();
+            setIsConnecting(false);
+            return;
+          } else {
+            setIsFastConnect(true);
+            setPin(stored.token.toString());
+            setStep(5);
+            setIsConnecting(false);
+            return;
+          }
+        }
+      }
+
+      // --- Normal server-mediated auth flow ---
       const deviceCertificateCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_CERTIFICATE));
       await bluetoothQueueContext.enqueue(() => deviceCertificateCharacteristic.writeValue(new Uint8Array([0x01])));
       const decoder = new TextDecoder('utf-8');
@@ -167,15 +221,35 @@ export default function DeviceConnector({
               if (isEncrypted) {
                 setStep(6);
                 showSuccess('Connection secured successfully!');
-                // Notify parent that device was connected/claimed
-                if (onDeviceConnected) {
-                  onDeviceConnected();
+
+                // Initialize Fast Connect token for future reconnections
+                try {
+                  const fastConnectInitCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.FASTCONNECT_INIT));
+                  // Write any value to generate a new token
+                  await bluetoothQueueContext.enqueue(() => fastConnectInitCharacteristic.writeValue(new Uint8Array([0x01])));
+                  // Read back the generated token_id (4 bytes) + token (4 bytes)
+                  const fastConnectData = await bluetoothQueueContext.enqueue(() => fastConnectInitCharacteristic.readValue());
+                  const newTokenId = fastConnectData.getUint32(0, true);
+                  const newToken = fastConnectData.getUint32(4, true);
+
+                  // Read device MAC
+                  const deviceMacCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_MAC));
+                  const macVal = await bluetoothQueueContext.enqueue(() => deviceMacCharacteristic.readValue());
+                  const mac = macBytesToString(macVal);
+
+                  saveFastConnectToken(mac, newTokenId, newToken);
+                  console.log('Fast Connect token stored for device', mac);
+                } catch (fcInitErr) {
+                  console.warn('Failed to initialize Fast Connect token:', fcInitErr);
                 }
+
+                // Notify parent that device was connected/claimed
+                if (onDeviceConnected) onDeviceConnected();
                 break;
               }
             }
-          }).catch((err) => {
-            showError(`Server confirmation failed: ${err.response?.data?.detail || err.message}`);
+          }).catch(() => {
+            showError(`Server confirmation failed - foreign device`); // : ${err.response?.data?.detail || err.message}
             setStep(0);
             setServer(null);
           });
@@ -236,6 +310,11 @@ export default function DeviceConnector({
     {
       label: 'Enter the PIN code',
       description: <>
+        {isFastConnect && (
+          <Alert severity="info" sx={{ mb: 1 }}>
+            ⚡ Fast Connect — using saved credentials. Enter the PIN below when prompted.
+          </Alert>
+        )}
         <Typography>Device successfully connected! Use the PIN code when prompted to establish secure connection.</Typography>
         <br />
         <Button variant="contained" onClick={async () => {
@@ -246,9 +325,27 @@ export default function DeviceConnector({
           const basicInfoService = await bluetoothQueueContext.enqueue(async () => server.getPrimaryService(BLEServiceEnum.BASIC_INFO_SERVICE));
           const deviceModeCharacteristic = await bluetoothQueueContext.enqueue(() => basicInfoService.getCharacteristic(BLECharacteristicEnum.DEVICE_MODE));
           await bluetoothQueueContext.enqueue(() => deviceModeCharacteristic.readValue());
+
+          // For fast connect: start polling for encryption after pairing prompt
+          if (isFastConnect && encryptedCharRef.current) {
+            const encChar = encryptedCharRef.current;
+            const pollEncryption = async () => {
+              while (true) {
+                const ev = await bluetoothQueueContext.enqueue(() => encChar.readValue());
+                if (ev.getUint8(0) === 1) {
+                  setStep(6);
+                  showSuccess('Connection secured via Fast Connect!');
+                  if (onDeviceConnected) onDeviceConnected();
+                  break;
+                }
+                await new Promise(r => setTimeout(r, 500));
+              }
+            };
+            pollEncryption();
+          }
         }}>Copy PIN code to clipboard and open prompt</Button>
       </>,
-      optional: <Typography variant="caption">PIN code is <Typography sx={{ fontWeight: 'bold' }}>{pin}</Typography></Typography>
+      optional: <Typography variant="caption">PIN code is <Typography component="span" sx={{ fontWeight: 'bold' }}>{pin}</Typography></Typography>
     },
     {
       label: 'Connection secured',
@@ -286,6 +383,23 @@ export default function DeviceConnector({
           sx={{ marginTop: 2 }}
         >Copy the link</Button>
       </Alert>
+
+      {hasStoredTokens && step === 0 && (
+        <Alert severity="info" sx={{ mb: 2 }} action={
+          <Button
+            color="warning"
+            size="small"
+            onClick={() => {
+              clearAllFastConnectTokens();
+              setHasStoredTokens(false);
+            }}
+          >
+            Clear
+          </Button>
+        }>
+          Fast Connect credentials are saved for known devices.
+        </Alert>
+      )}
 
       <Stepper activeStep={step} orientation="vertical">
         {connectingSteps.map((stepData, index) => (
